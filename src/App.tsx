@@ -32,9 +32,9 @@ type Result = {
 };
 
 const SIZES = [
-  { value: "1024x1024", name: "方形", detail: "1024 x 1024" },
-  { value: "1536x1024", name: "横向", detail: "1536 x 1024" },
-  { value: "1024x1536", name: "纵向", detail: "1024 x 1536" }
+  { value: "1024x1024", name: "正方形", detail: "1:1" },
+  { value: "1536x864", name: "电脑横屏", detail: "16:9" },
+  { value: "864x1536", name: "手机竖屏", detail: "9:16" }
 ];
 
 const PROMPTS = [
@@ -241,6 +241,7 @@ function App() {
       } else {
         const form = new FormData();
         form.append("prompt", prompt);
+        form.append("size", size);
         referenceImages.forEach((image) => form.append("image[]", image.file));
         if (maskFile) form.append("mask", maskFile);
         const request = fetch("/api/images/edit", { method: "POST", body: form });
@@ -353,19 +354,17 @@ function App() {
               <span>{prompt.length} / 4000</span>
             </div>
 
-            {mode === "generate" && !referenceImages.length && (
-              <div className="settings-block">
-                <label className="field-label" htmlFor="size">画幅</label>
-                <div className="select-wrap">
-                  <select id="size" value={size} onChange={(event) => setSize(event.target.value)}>
-                    {SIZES.map((option) => <option key={option.value} value={option.value}>{option.name} - {option.detail}</option>)}
-                  </select>
-                  <ChevronDown size={16} />
-                </div>
-                <div className={`ratio-preview ratio-${selectedSize.value.replace("x", "-")}`} aria-label={`当前画幅：${selectedSize.name}`} />
+            <div className="settings-block">
+              <label className="field-label" htmlFor="size">画幅</label>
+              <div className="select-wrap">
+                <select id="size" value={size} onChange={(event) => setSize(event.target.value)}>
+                  {SIZES.map((option) => <option key={option.value} value={option.value}>{option.name} - {option.detail}</option>)}
+                </select>
+                <ChevronDown size={16} />
               </div>
-            )}
-            {mode === "generate" && referenceImages.length > 0 && <p className="reference-note canvas-note">参考图模式会继承第一张图的画幅；如需局部改动，可上传遮罩。</p>}
+              <div className={`ratio-preview ratio-${selectedSize.value.replace("x", "-")}`} aria-label={`当前画幅：${selectedSize.name}`} />
+            </div>
+            {referenceImages.length > 0 && <p className="reference-note canvas-note">参考图仅提供内容和风格参考，输出将按所选画幅生成。</p>}
 
             {error && <p className="form-error" role="alert">{error}</p>}
             {!apiReady && <p className="setup-note"><CheckCircle2 size={15} /> 在 `.env` 配置 `SUDOCODE_API_KEY` 后即可调用。</p>}
