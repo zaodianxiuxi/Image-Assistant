@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -9,9 +9,11 @@ import {
   Eraser,
   ImagePlus,
   LoaderCircle,
+  Moon,
   Plus,
   RefreshCw,
   Sparkles,
+  Sun,
   Upload,
   WandSparkles,
   X
@@ -20,6 +22,7 @@ import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
+type Theme = "light" | "dark";
 type ReferenceImage = {
   file: File;
   preview: string;
@@ -39,6 +42,11 @@ const SIZES = [
 ];
 
 const MAX_REFERENCE_IMAGES = 10;
+function getInitialTheme(): Theme {
+  const savedTheme = window.localStorage.getItem("image-assistant-theme");
+  if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 function formatTime(date: Date) {
   return new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(date);
@@ -71,6 +79,10 @@ function App() {
   const [maskPreview, setMaskPreview] = useState("");
   const [current, setCurrent] = useState<Result | null>(null);
   const [history, setHistory] = useState<Result[]>([]);
+  const [preview, setPreview] = useState<Result | null>(null);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [failedImageSources, setFailedImageSources] = useState<Set<string>>(() => new Set());
+  const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [apiReady, setApiReady] = useState<boolean | null>(null);
@@ -92,6 +104,20 @@ function App() {
   useEffect(() => () => {
     previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    window.localStorage.setItem("image-assistant-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [preview]);
 
   useEffect(() => {
     if (!loading || !requestStartedAt) {
@@ -200,6 +226,30 @@ function App() {
     if (maskInput.current) maskInput.current.value = "";
   }
 
+  function openPreview(result: Result) {
+    setPreview(result);
+  }
+
+  function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
+    const source = event.currentTarget.dataset.imageSource;
+    if (source) setFailedImageSources((sources) => new Set(sources).add(source));
+  }
+
+  function retryImage(source: string) {
+    setFailedImageSources((sources) => {
+      const nextSources = new Set(sources);
+      nextSources.delete(source);
+      return nextSources;
+    });
+    setImageRetries((retries) => ({ ...retries, [source]: (retries[source] || 0) + 1 }));
+  }
+
+  function getImageSource(source: string) {
+    const retry = imageRetries[source];
+    if (!retry || source.startsWith("data:")) return source;
+    return `${source}${source.includes("?") ? "&" : "?"}previewRetry=${retry}`;
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!prompt.trim()) {
@@ -290,6 +340,15 @@ function App() {
           <span>Image Assistant</span>
         </a>
         <div className="topbar-actions">
+          <button
+            className="icon-button theme-toggle"
+            type="button"
+            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            title={theme === "light" ? "切换深色主题" : "切换浅色主题"}
+            aria-label={theme === "light" ? "切换深色主题" : "切换浅色主题"}
+          >
+            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+          </button>
           <a href="https://sudocode.chat/docs/image-api" target="_blank" rel="noreferrer" className="docs-link">
             API 文档 <ArrowUpRight size={14} />
           </a>
@@ -403,11 +462,17 @@ function App() {
                   {executionSteps.map((step, index) => <li key={step.id} className={index < activeStep ? "done" : index === activeStep ? "active" : ""}>{step.label}</li>)}
                 </ol>
               </div>
-            ) : current ? (
-              <figure className="result-frame">
-                <img src={current.src} alt={current.prompt} />
-                <figcaption><span>{current.kind === "generate" ? "生成" : "编辑"} · {formatTime(current.createdAt)}</span><p>{current.prompt}</p></figcaption>
-              </figure>
+              ) : current ? (
+                <figure className="result-frame">
+                  {failedImageSources.has(current.src) ? (
+                    <div className="image-load-error" role="alert"><strong>图片加载失败</strong><button type="button" onClick={() => retryImage(current.src)}><RefreshCw size={14} /> 重新加载</button></div>
+                  ) : (
+                    <button className="result-preview-trigger" type="button" onClick={() => openPreview(current)} aria-label="预览生成图片">
+                      <img key={`${current.id}-${imageRetries[current.src] || 0}`} src={getImageSource(current.src)} data-image-source={current.src} alt={current.prompt} onError={handleImageError} />
+                    </button>
+                  )}
+                  <figcaption><span>{current.kind === "generate" ? "生成" : "编辑"} · {formatTime(current.createdAt)}</span><p>{current.prompt}</p></figcaption>
+                </figure>
             ) : (
               <div className="empty-state"><span className="empty-icon"><Sparkles size={26} /></span><strong>{emptyTitle}</strong><p>填写提示词，然后在这里查看生成结果。</p></div>
             )}
@@ -417,16 +482,31 @@ function App() {
 
       <section className="history-section">
         <div className="history-heading"><div><span className="eyebrow">本次会话</span><h2>生成记录</h2></div>{history.length > 0 && <span>{history.length} 张图片</span>}</div>
-        {history.length ? (
-          <div className="history-grid">
-            {history.map((item) => <article className="history-item" key={item.id}><button onClick={() => setCurrent(item)}><img src={item.src} alt={item.prompt} /></button><div><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={`image-${item.id}.png`} /></div></article>)}
-          </div>
+          {history.length ? (
+            <div className="history-grid">
+            {history.map((item) => <article className="history-item" key={item.id}><button type="button" onClick={() => { setCurrent(item); openPreview(item); }} aria-label={`预览生成记录：${item.prompt}`}>{failedImageSources.has(item.src) ? <span className="history-image-error">图片加载失败</span> : <img key={`${item.id}-${imageRetries[item.src] || 0}`} src={getImageSource(item.src)} data-image-source={item.src} alt={item.prompt} onError={handleImageError} />}</button><div><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={`image-${item.id}.png`} /></div></article>)}
+            </div>
         ) : (
           <div className="history-empty"><Clock3 size={18} /> 生成的图片会保留在此浏览器会话中。</div>
         )}
       </section>
 
       <footer><span>Powered by gpt-image-2</span><span>图片仅在当前浏览器会话中保留</span></footer>
+      {preview && (
+        <div className="image-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
+          <section className="image-preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">
+            <div className="image-preview-toolbar"><span>{preview.kind === "generate" ? "生成图片预览" : "编辑图片预览"}</span><button className="icon-button" type="button" onClick={() => setPreview(null)} title="关闭预览" aria-label="关闭预览"><X size={18} /></button></div>
+            <div className="image-preview-media">
+              {failedImageSources.has(preview.src) ? (
+                <div className="image-load-error" role="alert"><strong>图片加载失败</strong><button type="button" onClick={() => retryImage(preview.src)}><RefreshCw size={14} /> 重新加载</button></div>
+              ) : (
+                <img key={`${preview.id}-${imageRetries[preview.src] || 0}`} src={getImageSource(preview.src)} data-image-source={preview.src} alt={preview.prompt} onError={handleImageError} />
+              )}
+            </div>
+            <p>{preview.prompt}</p>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
