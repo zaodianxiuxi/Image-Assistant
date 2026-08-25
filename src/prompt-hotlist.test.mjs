@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { PROMPT_HOTLIST, getDailyPromptHotlist } from "./prompt-hotlist.mjs";
+
+test("provides a substantial Chinese prompt collection across all supported aspect ratios", () => {
+  assert.ok(PROMPT_HOTLIST.length >= 16);
+  assert.deepEqual(
+    new Set(PROMPT_HOTLIST.map((item) => item.size)),
+    new Set(["1024x1024", "1536x864", "864x1536"])
+  );
+  assert.ok(PROMPT_HOTLIST.every((item) => item.prompt.length >= 80));
+});
+
+test("keeps the daily hotlist stable for the same day and limits visible entries", () => {
+  const date = new Date("2026-08-25T12:00:00.000Z");
+  const first = getDailyPromptHotlist(date, 6).map((item) => item.id);
+  const second = getDailyPromptHotlist(date, 6).map((item) => item.id);
+
+  assert.equal(first.length, 6);
+  assert.deepEqual(first, second);
+  assert.equal(new Set(first).size, 6);
+});

@@ -16,6 +16,7 @@ import {
   WandSparkles,
   X
 } from "lucide-react";
+import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -35,12 +36,6 @@ const SIZES = [
   { value: "1024x1024", name: "正方形", detail: "1:1" },
   { value: "1536x864", name: "电脑横屏", detail: "16:9" },
   { value: "864x1536", name: "手机竖屏", detail: "9:16" }
-];
-
-const PROMPTS = [
-  "晨雾中的现代玻璃山居，松林环绕，建筑摄影，柔和自然光",
-  "一台复古机械相机漂浮在钴蓝色水面上，产品摄影，镜面倒影",
-  "一张具有大胆排版的独立书店海报，红色与奶油白，丝网印刷质感"
 ];
 
 const MAX_REFERENCE_IMAGES = 10;
@@ -110,6 +105,11 @@ function App() {
   }, [loading, requestStartedAt]);
 
   const selectedSize = useMemo(() => SIZES.find((item) => item.value === size)!, [size]);
+  const dailyPrompts = useMemo(() => getDailyPromptHotlist(), []);
+  const hotlistDate = useMemo(
+    () => new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date()),
+    []
+  );
 
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
@@ -375,12 +375,17 @@ function App() {
             </button>
           </form>
 
-          {mode === "generate" && (
-            <div className="prompt-ideas">
-              <span>试试这些灵感</span>
-              {PROMPTS.map((idea) => <button key={idea} type="button" onClick={() => setPrompt(idea)}>{idea}</button>)}
+          <section className="prompt-hotlist" aria-label="今日提示词热榜">
+            <div className="hotlist-heading"><span>今日提示词热榜</span><small>{hotlistDate}</small></div>
+            <div className="hotlist-list">
+              {dailyPrompts.map((item, index) => (
+                <button key={item.id} type="button" className="hotlist-item" onClick={() => setPrompt(item.prompt)}>
+                  <span className="hotlist-rank">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="hotlist-copy"><strong>{item.title}</strong><small>{item.category} · {SIZES.find((option) => option.value === item.size)?.detail}</small><em>{item.prompt}</em></span>
+                </button>
+              ))}
             </div>
-          )}
+          </section>
         </aside>
 
         <section className="canvas-panel">
