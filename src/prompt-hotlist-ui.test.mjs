@@ -26,6 +26,14 @@ test("opens generated and history images in a resilient preview with a saved the
   assert.match(source, /localStorage\.setItem\("image-assistant-theme"/);
   assert.match(source, /Moon/);
   assert.match(source, /Sun/);
-  assert.match(styles, /\.result-preview-trigger img \{[^}]*max-width: 100%[^}]*max-height: 100%/);
+  assert.match(styles, /\.result-preview-trigger img \{[^}]*object-fit: contain/);
   assert.match(styles, /prefers-reduced-motion/);
+});
+
+test("keeps complete thumbnails visible and frames the result image inside the canvas", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.history-item img \{[^}]*object-fit: contain/);
+  assert.match(styles, /\.result-preview-trigger \{[^}]*padding: clamp\(24px, 5vw, 72px\)/);
+  assert.match(styles, /\.result-preview-trigger img \{[^}]*max-width: min\(100%, 900px\)[^}]*max-height: min\(100%, 620px\)/);
 });
