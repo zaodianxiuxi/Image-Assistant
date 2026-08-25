@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "nodemon --watch server --watch .env --ext mjs,env --exec node server/index.mjs",
+    "test": "node --test",
     "build": "tsc -b && vite build",
     "start": "node server/index.mjs"
   },
