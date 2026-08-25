@@ -1,38 +1,38 @@
-# Ten Reference Images Design
+# 支持十张参考图设计说明
 
-## Goal
+## 目标
 
-Allow a user to submit up to ten reference images for a generation or edit request while preventing oversized multipart requests from exhausting the local proxy's memory.
+允许用户在生成或编辑请求中最多提交十张参考图，同时防止过大的 multipart 请求耗尽本地代理的内存。
 
-## Scope
+## 范围
 
-- The React UI accepts and displays up to ten reference images.
-- The local Express proxy accepts up to ten `image[]` fields.
-- The proxy rejects an edit request when all uploaded images and an optional mask exceed 50 MB in total.
-- Existing per-file protection remains 20 MB.
+- React 界面可选择并展示最多十张参考图。
+- 本地 Express 代理最多接收十个 `image[]` 字段。
+- 图片和可选遮罩的总大小超过 50 MB 时，代理拒绝该编辑请求。
+- 保留现有的单文件 20 MB 限制。
 
-## Request Flow
+## 请求流程
 
-1. The browser limits selection to ten image files and continues to show their count.
-2. The browser posts them as repeated `image[]` multipart fields, as it does today.
-3. Multer rejects individual files larger than 20 MB and more than ten `image[]` fields.
-4. The route sums the uploaded image and mask sizes before calling SudoCode. Requests over 50 MB receive a `413` response with a Chinese error message.
-5. Valid requests are forwarded unchanged to the SudoCode-compatible image edits endpoint.
+1. 浏览器最多选择十张图片，并继续展示当前已选择数量。
+2. 浏览器沿用当前方式，将图片作为重复的 `image[]` multipart 字段提交。
+3. Multer 拒绝大于 20 MB 的单个文件，以及超过十个的 `image[]` 字段。
+4. 路由在调用 SudoCode 前汇总图片和遮罩的大小；总量超过 50 MB 时，返回带中文说明的 `413` 响应。
+5. 合法请求保持原有格式，转发至 SudoCode 兼容的图片编辑接口。
 
-## Error Handling
+## 错误处理
 
-- More than ten client-selected files: retain the first available files and show the existing capacity message with the new limit.
-- More than ten multipart image fields: Multer rejects the request before it reaches the upstream API.
-- Total files and mask over 50 MB: return `413` without consuming upstream API quota.
-- Upstream rejection of ten images: continue returning the provider's status and message; no automatic retry is attempted.
+- 前端选择超过十张：保留可接收的前若干张，并按新上限显示容量提示。
+- multipart 图片字段超过十个：由 Multer 在请求到达上游前拒绝。
+- 图片和遮罩总量超过 50 MB：返回 `413`，不会消耗上游 API 额度。
+- 上游拒绝十张图片：继续返回上游状态码和错误信息，不自动重试。
 
-## Testing And Validation
+## 测试与验证
 
-- Add a server-level test for the total-upload-size validator, including exactly 50 MB and over-50 MB cases.
-- Run the project build after implementation.
-- Do not make live 5-, 8-, or 10-image API calls in this change because those requests may consume the user's SudoCode quota. Those can be run later with explicit approval.
+- 添加服务端总上传大小校验的测试，覆盖刚好 50 MB 与超过 50 MB 的情形。
+- 实现后运行项目构建。
+- 此次改动不发起真实的 5、8、10 张图片 API 请求，以免消耗 SudoCode 额度；后续可在明确授权后单独验证。
 
-## Non-Goals
+## 非目标
 
-- No change to provider model, pricing, output format, or image generation endpoint.
-- No persistent upload storage or server-side image transformation.
+- 不修改上游模型、价格、输出格式或图片生成接口。
+- 不增加持久化上传存储或服务端图片转换。
