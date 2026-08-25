@@ -144,15 +144,15 @@ app.post("/api/events", (req, res) => {
 });
 
 app.post("/api/images/generate", async (req, res) => {
-  if (!requireApiKey(req, res)) return;
   const { prompt, size } = req.body || {};
-  if (typeof prompt !== "string" || !prompt.trim()) {
-    sendError(req, res, 400, "请输入图片提示词。");
-    return;
-  }
   const imageSize = size ?? DEFAULT_IMAGE_SIZE;
   if (!isSupportedImageSize(imageSize)) {
     sendError(req, res, 400, "不支持的输出画幅。请选择正方形、电脑横屏或手机竖屏。", { operation: "generate" });
+    return;
+  }
+  if (!requireApiKey(req, res)) return;
+  if (typeof prompt !== "string" || !prompt.trim()) {
+    sendError(req, res, 400, "请输入图片提示词。");
     return;
   }
 
@@ -185,6 +185,11 @@ app.post(
     { name: "mask", maxCount: 1 }
   ]),
   async (req, res) => {
+    const imageSize = req.body?.size ?? DEFAULT_IMAGE_SIZE;
+    if (!isSupportedImageSize(imageSize)) {
+      sendError(req, res, 400, "不支持的输出画幅。请选择正方形、电脑横屏或手机竖屏。", { operation: "edit" });
+      return;
+    }
     if (!requireApiKey(req, res)) return;
     const images = req.files?.["image[]"] || [];
     const mask = req.files?.mask?.[0];
@@ -195,11 +200,6 @@ app.post(
     }
     if (typeof prompt !== "string" || !prompt.trim()) {
       sendError(req, res, 400, "请输入编辑提示词。");
-      return;
-    }
-    const imageSize = req.body?.size ?? DEFAULT_IMAGE_SIZE;
-    if (!isSupportedImageSize(imageSize)) {
-      sendError(req, res, 400, "不支持的输出画幅。请选择正方形、电脑横屏或手机竖屏。", { operation: "edit" });
       return;
     }
     const uploadFiles = [...images, ...(mask ? [mask] : [])];
