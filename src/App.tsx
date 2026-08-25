@@ -43,7 +43,7 @@ const PROMPTS = [
   "一张具有大胆排版的独立书店海报，红色与奶油白，丝网印刷质感"
 ];
 
-const MAX_REFERENCE_IMAGES = 4;
+const MAX_REFERENCE_IMAGES = 10;
 
 function formatTime(date: Date) {
   return new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(date);
@@ -328,7 +328,7 @@ function App() {
                   <button type="button" className="upload-zone" onClick={() => sourceInput.current?.click()}>
                     <ImagePlus size={19} />
                     <span>{sourceTitle}</span>
-                    <small>可一次选择多张，最多 {MAX_REFERENCE_IMAGES} 张，每张最大 20 MB</small>
+                    <small>可一次选择多张，最多 {MAX_REFERENCE_IMAGES} 张，每张最大 20 MB，总计最大 50 MB</small>
                   </button>
                 )}
                 {mode === "generate" && referenceImages.length > 0 && <p className="reference-note">已启用 {referenceImages.length} 张参考图，会通过图片编辑接口生成结果。</p>}
