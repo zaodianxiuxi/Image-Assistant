@@ -2,11 +2,17 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import multer from "multer";
+import {
+  MAX_FILE_BYTES,
+  MAX_REFERENCE_IMAGES,
+  MAX_UPLOAD_BYTES,
+  hasUploadSizeWithinLimit
+} from "./upload-limits.mjs";
 
 const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }
+  limits: { fileSize: MAX_FILE_BYTES }
 });
 const port = Number(process.env.PORT || 3001);
 const apiBase = (process.env.SUDOCODE_BASE_URL || "https://api.sudocode.chat/v1").replace(/\/$/, "");
@@ -125,7 +131,7 @@ app.post("/api/events", (req, res) => {
     event,
     mode: mode === "edit" ? "edit" : "generate",
     promptChars: Number.isFinite(promptChars) ? Math.min(Math.max(promptChars, 0), 4000) : undefined,
-    referenceCount: Number.isFinite(referenceCount) ? Math.min(Math.max(referenceCount, 0), 4) : undefined,
+    referenceCount: Number.isFinite(referenceCount) ? Math.min(Math.max(referenceCount, 0), MAX_REFERENCE_IMAGES) : undefined,
     file: file && typeof file === "object"
       ? {
           mimeType: typeof file.mimeType === "string" ? file.mimeType : undefined,
@@ -169,7 +175,7 @@ app.post("/api/images/generate", async (req, res) => {
 app.post(
   "/api/images/edit",
   upload.fields([
-    { name: "image[]", maxCount: 4 },
+    { name: "image[]", maxCount: MAX_REFERENCE_IMAGES },
     { name: "mask", maxCount: 1 }
   ]),
   async (req, res) => {
@@ -183,6 +189,11 @@ app.post(
     }
     if (typeof prompt !== "string" || !prompt.trim()) {
       sendError(req, res, 400, "请输入编辑提示词。");
+      return;
+    }
+    const uploadFiles = [...images, ...(mask ? [mask] : [])];
+    if (!hasUploadSizeWithinLimit(uploadFiles)) {
+      sendError(req, res, 413, `图片和遮罩总大小不能超过 ${MAX_UPLOAD_BYTES / 1024 / 1024} MB。`, { operation: "upload" });
       return;
     }
 
