@@ -12,3 +12,20 @@ test("renders the daily prompt hotlist and fills the selected prompt", async () 
   assert.match(source, /onClick=\{\(\) => setPrompt\(item\.prompt\)\}/);
   assert.match(declaration, /export function getDailyPromptHotlist/);
 });
+
+test("opens generated and history images in a resilient preview with a saved theme", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /function openPreview\(result: Result\)/);
+  assert.match(source, /onClick=\{\(\) => openPreview\(current\)\}/);
+  assert.match(source, /onClick=\{\(\) => \{ setCurrent\(item\); openPreview\(item\); \}\}/);
+  assert.match(source, /onError=\{handleImageError\}/);
+  assert.match(source, /图片加载失败/);
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /localStorage\.setItem\("image-assistant-theme"/);
+  assert.match(source, /Moon/);
+  assert.match(source, /Sun/);
+  assert.match(styles, /\.result-preview-trigger img \{[^}]*max-width: 100%[^}]*max-height: 100%/);
+  assert.match(styles, /prefers-reduced-motion/);
+});
