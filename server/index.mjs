@@ -8,6 +8,7 @@ import {
   MAX_UPLOAD_BYTES,
   hasUploadSizeWithinLimit
 } from "./upload-limits.mjs";
+import { DEFAULT_IMAGE_SIZE, isSupportedImageSize } from "./image-sizes.mjs";
 
 const app = express();
 const upload = multer({
@@ -143,8 +144,13 @@ app.post("/api/events", (req, res) => {
 });
 
 app.post("/api/images/generate", async (req, res) => {
-  if (!requireApiKey(req, res)) return;
   const { prompt, size } = req.body || {};
+  const imageSize = size ?? DEFAULT_IMAGE_SIZE;
+  if (!isSupportedImageSize(imageSize)) {
+    sendError(req, res, 400, "不支持的输出画幅。请选择正方形、电脑横屏或手机竖屏。", { operation: "generate" });
+    return;
+  }
+  if (!requireApiKey(req, res)) return;
   if (typeof prompt !== "string" || !prompt.trim()) {
     sendError(req, res, 400, "请输入图片提示词。");
     return;
@@ -156,13 +162,13 @@ app.post("/api/images/generate", async (req, res) => {
     endpoint: `${apiBase}/images/generations`,
     model: "gpt-image-2",
     promptChars: prompt.trim().length,
-    size: size || null
+    size: imageSize
   });
   try {
     const response = await fetch(`${apiBase}/images/generations`, {
       method: "POST",
       headers: { ...headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-2", prompt: prompt.trim(), ...(size ? { size } : {}) })
+      body: JSON.stringify({ model: "gpt-image-2", prompt: prompt.trim(), size: imageSize })
     });
     res.json(await parseProviderResponse(response, req.requestId, "generate"));
   } catch (error) {
@@ -179,6 +185,11 @@ app.post(
     { name: "mask", maxCount: 1 }
   ]),
   async (req, res) => {
+    const imageSize = req.body?.size ?? DEFAULT_IMAGE_SIZE;
+    if (!isSupportedImageSize(imageSize)) {
+      sendError(req, res, 400, "不支持的输出画幅。请选择正方形、电脑横屏或手机竖屏。", { operation: "edit" });
+      return;
+    }
     if (!requireApiKey(req, res)) return;
     const images = req.files?.["image[]"] || [];
     const mask = req.files?.mask?.[0];
@@ -203,6 +214,7 @@ app.post(
       endpoint: `${apiBase}/images/edits`,
       model: "gpt-image-2",
       promptChars: prompt.trim().length,
+      size: imageSize,
       imageCount: images.length,
       images: images.map((image) => ({ name: image.originalname, mimeType: image.mimetype, bytes: image.size })),
       mask: mask ? { name: mask.originalname, mimeType: mask.mimetype, bytes: mask.size } : null
@@ -211,6 +223,7 @@ app.post(
       const form = new FormData();
       form.append("model", "gpt-image-2");
       form.append("prompt", prompt.trim());
+      form.append("size", imageSize);
       images.forEach((image) => {
         form.append("image[]", new Blob([image.buffer], { type: image.mimetype }), image.originalname);
       });
