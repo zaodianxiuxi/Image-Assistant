@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .idea/
+.worktrees/
 .env
 .env.local
 *.log
