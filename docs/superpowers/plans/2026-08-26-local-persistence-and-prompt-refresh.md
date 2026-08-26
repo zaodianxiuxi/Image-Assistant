@@ -158,7 +158,7 @@ git commit -m "功能：通过本地路由访问生成图片"
 - Produces: getDailyPromptHotlist(date, count, refreshIndex, extraPrompts)。
 - Produces: handleHotlistRefresh(): void。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("changes the unique six-item selection when refresh index changes", () => {
@@ -170,13 +170,13 @@ test("changes the unique six-item selection when refresh index changes", () => {
 });
 ~~~
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: node --test src/prompt-hotlist.test.mjs
 
 Expected: FAIL，刷新索引尚未影响洗牌种子。
 
-- [ ] **Step 3: 实现刷新种子和图标按钮**
+- [x] **Step 3: 实现刷新种子和图标按钮**
 
 ~~~tsx
 const [hotlistRefreshIndex, setHotlistRefreshIndex] = useState(0);
@@ -187,14 +187,14 @@ const dailyPrompts = useMemo(
 // 使用 RefreshCw 图标按钮；点击时递增刷新索引，不修改 size。
 ~~~
 
-- [ ] **Step 4: 验证前端逻辑与构建**
+- [x] **Step 4: 验证前端逻辑与构建**
 
 Run: node --test src/prompt-hotlist.test.mjs src/prompt-hotlist-ui.test.mjs
 Run: npm run build
 
 Expected: 两条命令均成功。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add src/prompt-hotlist.mjs src/prompt-hotlist.test.mjs src/App.tsx src/styles.css src/prompt-hotlist-ui.test.mjs

@@ -8,9 +8,19 @@ test("renders the daily prompt hotlist and fills the selected prompt", async () 
 
   assert.match(source, /from "\.\/prompt-hotlist\.mjs"/);
   assert.match(source, /今日提示词热榜/);
-  assert.match(source, /getDailyPromptHotlist\(\)/);
+  assert.match(source, /getDailyPromptHotlist\(new Date\(\), 6, hotlistRefreshIndex\)/);
   assert.match(source, /onClick=\{\(\) => setPrompt\(item\.prompt\)\}/);
   assert.match(declaration, /export function getDailyPromptHotlist/);
+});
+
+test("provides an icon-only local refresh action for the prompt hotlist", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /hotlistRefreshIndex/);
+  assert.match(source, /aria-label="刷新今日提示词"/);
+  assert.match(source, /setHotlistRefreshIndex\(\(value\) => value \+ 1\)/);
+  assert.match(styles, /\.hotlist-refresh/);
 });
 
 test("opens generated and history images in a resilient preview with a saved theme", async () => {

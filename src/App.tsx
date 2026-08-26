@@ -89,6 +89,7 @@ function App() {
   const [executionStage, setExecutionStage] = useState<ExecutionStage>("idle");
   const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [hotlistRefreshIndex, setHotlistRefreshIndex] = useState(0);
   const sourceInput = useRef<HTMLInputElement>(null);
   const maskInput = useRef<HTMLInputElement>(null);
   const inputLogged = useRef(false);
@@ -131,7 +132,10 @@ function App() {
   }, [loading, requestStartedAt]);
 
   const selectedSize = useMemo(() => SIZES.find((item) => item.value === size)!, [size]);
-  const dailyPrompts = useMemo(() => getDailyPromptHotlist(), []);
+  const dailyPrompts = useMemo(
+    () => getDailyPromptHotlist(new Date(), 6, hotlistRefreshIndex),
+    [hotlistRefreshIndex]
+  );
   const hotlistDate = useMemo(
     () => new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date()),
     []
@@ -435,7 +439,21 @@ function App() {
           </form>
 
           <section className="prompt-hotlist" aria-label="今日提示词热榜">
-            <div className="hotlist-heading"><span>今日提示词热榜</span><small>{hotlistDate}</small></div>
+            <div className="hotlist-heading">
+              <span>今日提示词热榜</span>
+              <div className="hotlist-meta">
+                <small>{hotlistDate}</small>
+                <button
+                  className="hotlist-refresh"
+                  type="button"
+                  onClick={() => setHotlistRefreshIndex((value) => value + 1)}
+                  title="刷新今日提示词"
+                  aria-label="刷新今日提示词"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
             <div className="hotlist-list">
               {dailyPrompts.map((item, index) => (
                 <button key={item.id} type="button" className="hotlist-item" onClick={() => setPrompt(item.prompt)}>
