@@ -52,7 +52,7 @@
 - Produces: saveProviderImage({ item, outputDirectory, fetchImpl, now, randomUuid }): Promise<{ fileName, imageUrl }>
 - Produces: isSafeGeneratedImageFileName(fileName): boolean
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("writes both provider result types to a controlled local PNG URL", async () => {
@@ -63,13 +63,13 @@ test("writes both provider result types to a controlled local PNG URL", async ()
 });
 ~~~
 
-- [ ] **Step 2: 验证测试先失败**
+- [x] **Step 2: 验证测试先失败**
 
 Run: node --test server/generated-image-store.test.mjs
 
 Expected: FAIL，模块及函数尚不存在。
 
-- [ ] **Step 3: 实现最小存储模块**
+- [x] **Step 3: 实现最小存储模块**
 
 ~~~js
 export async function getDesktopAppDirectory(options = {}) {
@@ -84,13 +84,13 @@ export async function saveProviderImage({ item, outputDirectory, fetchImpl = fet
 }
 ~~~
 
-- [ ] **Step 4: 验证目录、Base64、URL、目录复用和文件名安全**
+- [x] **Step 4: 验证目录、Base64、URL、目录复用和文件名安全**
 
 Run: node --test server/generated-image-store.test.mjs
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add server/desktop-path.mjs server/generated-image-store.mjs server/generated-image-store.test.mjs
