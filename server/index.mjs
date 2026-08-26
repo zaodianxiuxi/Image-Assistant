@@ -1,7 +1,12 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import express from "express";
 import multer from "multer";
+import { getDesktopAppDirectory } from "./desktop-path.mjs";
+import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-image-store.mjs";
+import { readPromptCache, validatePromptCandidates, writePromptCache } from "./prompt-cache.mjs";
+import { generatePromptCandidates } from "./prompt-generator.mjs";
 import {
   MAX_FILE_BYTES,
   MAX_REFERENCE_IMAGES,
@@ -9,6 +14,7 @@ import {
   hasUploadSizeWithinLimit
 } from "./upload-limits.mjs";
 import { DEFAULT_IMAGE_SIZE, isSupportedImageSize } from "./image-sizes.mjs";
+import { PROMPT_HOTLIST } from "../src/prompt-hotlist.mjs";
 
 const app = express();
 const upload = multer({
@@ -17,6 +23,7 @@ const upload = multer({
 });
 const port = Number(process.env.PORT || 3001);
 const apiBase = (process.env.SUDOCODE_BASE_URL || "https://api.sudocode.chat/v1").replace(/\/$/, "");
+let generatedImageDirectoryPromise;
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -65,6 +72,16 @@ function headers() {
   return { Authorization: `Bearer ${process.env.SUDOCODE_API_KEY}` };
 }
 
+function getGeneratedImageDirectory() {
+  // Resolve once, on demand, so health and validation endpoints remain available if disk setup fails.
+  generatedImageDirectoryPromise ??= getDesktopAppDirectory();
+  return generatedImageDirectoryPromise;
+}
+
+async function getPromptCacheFile() {
+  return path.join(await getGeneratedImageDirectory(), "prompt-cache.json");
+}
+
 async function parseProviderResponse(response, requestId, operation) {
   const raw = await response.text();
   let body;
@@ -101,14 +118,68 @@ async function parseProviderResponse(response, requestId, operation) {
     throw new Error("接口未返回图片数据，请检查模型权限或请求参数。");
   }
 
-  return {
-    image: item.b64_json ? `data:image/png;base64,${item.b64_json}` : item.url,
-    revisedPrompt: item.revised_prompt || null
-  };
+  const savedImage = await saveProviderImage({
+    item,
+    outputDirectory: await getGeneratedImageDirectory()
+  });
+  return { image: savedImage.imageUrl, revisedPrompt: item.revised_prompt || null };
 }
 
 app.get("/api/health", (_req, res) => {
   res.json({ configured: Boolean(process.env.SUDOCODE_API_KEY), baseUrl: apiBase });
+});
+
+app.get("/api/prompts", async (req, res) => {
+  try {
+    res.json({ prompts: await readPromptCache(await getPromptCacheFile()) });
+  } catch (error) {
+    sendError(req, res, 500, "读取本地提示词缓存失败。", { operation: "prompt_cache", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/prompts/generate", async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  if (!process.env.SUDOCODE_TEXT_MODEL) {
+    sendError(req, res, 503, "未配置 SUDOCODE_TEXT_MODEL，无法生成新灵感。", { operation: "prompt_generate" });
+    return;
+  }
+
+  try {
+    const cacheFile = await getPromptCacheFile();
+    const cachedPrompts = await readPromptCache(cacheFile);
+    const generatedPrompts = await generatePromptCandidates({
+      apiBase,
+      apiKey: process.env.SUDOCODE_API_KEY,
+      model: process.env.SUDOCODE_TEXT_MODEL,
+      existingPrompts: [...PROMPT_HOTLIST, ...cachedPrompts]
+    });
+    const updatedCache = validatePromptCandidates([...generatedPrompts, ...cachedPrompts], PROMPT_HOTLIST);
+    await writePromptCache(cacheFile, updatedCache);
+    res.json({ prompts: generatedPrompts });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "生成新灵感失败。";
+    sendError(req, res, 502, message, { operation: "prompt_generate", ...errorDetails(error) });
+  }
+});
+
+app.get("/generated-images/:fileName", async (req, res, next) => {
+  if (!isSafeGeneratedImageFileName(req.params.fileName)) {
+    res.sendStatus(404);
+    return;
+  }
+  try {
+    const root = await getGeneratedImageDirectory();
+    res.sendFile(req.params.fileName, { root, dotfiles: "deny" }, (error) => {
+      if (!error) return;
+      if (error.code === "ENOENT" || error.status === 404) {
+        res.sendStatus(404);
+        return;
+      }
+      next(error);
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 const clientEvents = new Set([

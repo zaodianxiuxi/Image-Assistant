@@ -20,3 +20,12 @@ test("keeps the daily hotlist stable for the same day and limits visible entries
   assert.deepEqual(first, second);
   assert.equal(new Set(first).size, 6);
 });
+
+test("changes the unique hotlist selection when the refresh index changes", () => {
+  const date = new Date("2026-08-26T08:00:00.000Z");
+  const first = getDailyPromptHotlist(date, 6, 0).map((item) => item.id);
+  const next = getDailyPromptHotlist(date, 6, 1).map((item) => item.id);
+
+  assert.equal(new Set(next).size, 6);
+  assert.notDeepEqual(next, first);
+});

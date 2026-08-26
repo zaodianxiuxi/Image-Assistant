@@ -140,10 +140,21 @@ function seededRandom(seed) {
   };
 }
 
-export function getDailyPromptHotlist(date = new Date(), count = 6) {
-  const dateKey = date.toISOString().slice(0, 10);
+function dedupePrompts(prompts) {
+  const seen = new Set();
+  return prompts.filter((item) => {
+    const key = typeof item?.prompt === "string" ? item.prompt.trim() : "";
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function getDailyPromptHotlist(date = new Date(), count = 6, refreshIndex = 0, extraPrompts = []) {
+  // The refresh index creates a new stable order without turning refresh into a network request.
+  const dateKey = `${date.toISOString().slice(0, 10)}:${Math.max(0, Math.floor(refreshIndex))}`;
   const random = seededRandom(hashDate(dateKey));
-  const prompts = [...PROMPT_HOTLIST];
+  const prompts = dedupePrompts([...extraPrompts, ...PROMPT_HOTLIST]);
 
   for (let index = prompts.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));

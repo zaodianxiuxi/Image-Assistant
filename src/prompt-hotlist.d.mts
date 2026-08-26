@@ -8,4 +8,9 @@ export type PromptHotlistItem = {
 
 export const PROMPT_HOTLIST: PromptHotlistItem[];
 
-export function getDailyPromptHotlist(date?: Date, count?: number): PromptHotlistItem[];
+export function getDailyPromptHotlist(
+  date?: Date,
+  count?: number,
+  refreshIndex?: number,
+  extraPrompts?: PromptHotlistItem[]
+): PromptHotlistItem[];

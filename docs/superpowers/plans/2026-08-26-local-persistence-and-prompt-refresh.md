@@ -52,7 +52,7 @@
 - Produces: saveProviderImage({ item, outputDirectory, fetchImpl, now, randomUuid }): Promise<{ fileName, imageUrl }>
 - Produces: isSafeGeneratedImageFileName(fileName): boolean
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("writes both provider result types to a controlled local PNG URL", async () => {
@@ -63,13 +63,13 @@ test("writes both provider result types to a controlled local PNG URL", async ()
 });
 ~~~
 
-- [ ] **Step 2: 验证测试先失败**
+- [x] **Step 2: 验证测试先失败**
 
 Run: node --test server/generated-image-store.test.mjs
 
 Expected: FAIL，模块及函数尚不存在。
 
-- [ ] **Step 3: 实现最小存储模块**
+- [x] **Step 3: 实现最小存储模块**
 
 ~~~js
 export async function getDesktopAppDirectory(options = {}) {
@@ -84,13 +84,13 @@ export async function saveProviderImage({ item, outputDirectory, fetchImpl = fet
 }
 ~~~
 
-- [ ] **Step 4: 验证目录、Base64、URL、目录复用和文件名安全**
+- [x] **Step 4: 验证目录、Base64、URL、目录复用和文件名安全**
 
 Run: node --test server/generated-image-store.test.mjs
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add server/desktop-path.mjs server/generated-image-store.mjs server/generated-image-store.test.mjs
@@ -108,7 +108,7 @@ git commit -m "功能：保存生成图片到桌面"
 - Produces: 图片 API 的 image 字段为 /generated-images/<server-file>.png。
 - Produces: GET /generated-images/:fileName，仅响应服务端规则生成的 PNG。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("rejects traversal and non-PNG generated-image paths", () => {
@@ -118,13 +118,13 @@ test("rejects traversal and non-PNG generated-image paths", () => {
 });
 ~~~
 
-- [ ] **Step 2: 验证新增断言失败**
+- [x] **Step 2: 验证新增断言失败**
 
 Run: node --test server/generated-image-store.test.mjs
 
 Expected: FAIL，直到文件名白名单实现。
 
-- [ ] **Step 3: 让 generate/edit 统一保存结果并提供受控路由**
+- [x] **Step 3: 让 generate/edit 统一保存结果并提供受控路由**
 
 ~~~js
 const generatedImageDirectory = await getDesktopAppDirectory();
@@ -132,13 +132,13 @@ const generatedImageDirectory = await getDesktopAppDirectory();
 // 路由先校验 isSafeGeneratedImageFileName，再使用 res.sendFile(fileName, { root: generatedImageDirectory, dotfiles: "deny" })。
 ~~~
 
-- [ ] **Step 4: 运行服务端回归测试**
+- [x] **Step 4: 运行服务端回归测试**
 
 Run: node --test server/*.test.mjs
 
 Expected: PASS，包含尺寸、上传限制和图片落盘测试。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add server/index.mjs server/generated-image-store.test.mjs
@@ -158,7 +158,7 @@ git commit -m "功能：通过本地路由访问生成图片"
 - Produces: getDailyPromptHotlist(date, count, refreshIndex, extraPrompts)。
 - Produces: handleHotlistRefresh(): void。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("changes the unique six-item selection when refresh index changes", () => {
@@ -170,13 +170,13 @@ test("changes the unique six-item selection when refresh index changes", () => {
 });
 ~~~
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: node --test src/prompt-hotlist.test.mjs
 
 Expected: FAIL，刷新索引尚未影响洗牌种子。
 
-- [ ] **Step 3: 实现刷新种子和图标按钮**
+- [x] **Step 3: 实现刷新种子和图标按钮**
 
 ~~~tsx
 const [hotlistRefreshIndex, setHotlistRefreshIndex] = useState(0);
@@ -187,14 +187,14 @@ const dailyPrompts = useMemo(
 // 使用 RefreshCw 图标按钮；点击时递增刷新索引，不修改 size。
 ~~~
 
-- [ ] **Step 4: 验证前端逻辑与构建**
+- [x] **Step 4: 验证前端逻辑与构建**
 
 Run: node --test src/prompt-hotlist.test.mjs src/prompt-hotlist-ui.test.mjs
 Run: npm run build
 
 Expected: 两条命令均成功。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add src/prompt-hotlist.mjs src/prompt-hotlist.test.mjs src/App.tsx src/styles.css src/prompt-hotlist-ui.test.mjs
@@ -219,7 +219,7 @@ git commit -m "功能：支持刷新今日提示词"
 - Produces: generatePromptCandidates({ apiBase, apiKey, model, fetchImpl }): Promise<PromptItem[]>
 - Produces: POST /api/prompts/generate -> { prompts: PromptItem[] }
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("rejects invalid prompt entries and limits persistent cache entries", async () => {
@@ -230,13 +230,13 @@ test("rejects invalid prompt entries and limits persistent cache entries", async
 });
 ~~~
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: node --test server/prompt-cache.test.mjs server/prompt-generator.test.mjs
 
 Expected: FAIL，新增模块不存在。
 
-- [ ] **Step 3: 实现严格校验和原子缓存**
+- [x] **Step 3: 实现严格校验和原子缓存**
 
 ~~~js
 // 接受 title、category、size、prompt、id；要求中文、非空、80-500 字、允许画幅和内容去重。
@@ -244,7 +244,7 @@ Expected: FAIL，新增模块不存在。
 // 未配置 model 时抛出“未配置 SUDOCODE_TEXT_MODEL，无法生成新灵感。”。
 ~~~
 
-- [ ] **Step 4: 实现 OpenAI 兼容服务端接口**
+- [x] **Step 4: 实现 OpenAI 兼容服务端接口**
 
 ~~~js
 app.post("/api/prompts/generate", async (req, res) => {
@@ -254,13 +254,13 @@ app.post("/api/prompts/generate", async (req, res) => {
 });
 ~~~
 
-- [ ] **Step 5: 更新配置并运行服务端测试**
+- [x] **Step 5: 更新配置并运行服务端测试**
 
 Run: node --test server/*.test.mjs
 
 Expected: PASS，覆盖未配置模型、合法 JSON、非法字段、缓存容量和图片测试。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ~~~bash
 git add server/prompt-cache.mjs server/prompt-cache.test.mjs server/prompt-generator.mjs server/prompt-generator.test.mjs server/image-sizes.mjs server/index.mjs .env.example
@@ -279,7 +279,7 @@ git commit -m "功能：支持生成热榜新灵感"
 - Consumes: POST /api/prompts/generate 的 { prompts }。
 - Produces: handleGeneratePromptIdeas(): Promise<void>。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("renders the model ideas action with a duplicate-request guard", () => {
@@ -290,13 +290,13 @@ test("renders the model ideas action with a duplicate-request guard", () => {
 });
 ~~~
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: node --test src/prompt-hotlist-ui.test.mjs
 
 Expected: FAIL，生成处理函数与加载状态尚不存在。
 
-- [ ] **Step 3: 实现按钮、加载态、成功合并和失败反馈**
+- [x] **Step 3: 实现按钮、加载态、成功合并和失败反馈**
 
 ~~~tsx
 async function handleGeneratePromptIdeas() {
@@ -311,14 +311,14 @@ async function handleGeneratePromptIdeas() {
 // “生成新灵感”在 loading 时 disabled；普通刷新仍保持可用。
 ~~~
 
-- [ ] **Step 4: 更新 HANDOFF.md 并运行全量验证**
+- [x] **Step 4: 更新 HANDOFF.md 并运行全量验证**
 
 Run: npm test
 Run: npm run build
 
 Expected: 两条命令退出码为 0。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add src/App.tsx src/styles.css src/prompt-hotlist-ui.test.mjs HANDOFF.md
