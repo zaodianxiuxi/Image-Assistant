@@ -2,6 +2,8 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import multer from "multer";
+import { getDesktopAppDirectory } from "./desktop-path.mjs";
+import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-image-store.mjs";
 import {
   MAX_FILE_BYTES,
   MAX_REFERENCE_IMAGES,
@@ -17,6 +19,7 @@ const upload = multer({
 });
 const port = Number(process.env.PORT || 3001);
 const apiBase = (process.env.SUDOCODE_BASE_URL || "https://api.sudocode.chat/v1").replace(/\/$/, "");
+let generatedImageDirectoryPromise;
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -65,6 +68,12 @@ function headers() {
   return { Authorization: `Bearer ${process.env.SUDOCODE_API_KEY}` };
 }
 
+function getGeneratedImageDirectory() {
+  // Resolve once, on demand, so health and validation endpoints remain available if disk setup fails.
+  generatedImageDirectoryPromise ??= getDesktopAppDirectory();
+  return generatedImageDirectoryPromise;
+}
+
 async function parseProviderResponse(response, requestId, operation) {
   const raw = await response.text();
   let body;
@@ -101,14 +110,35 @@ async function parseProviderResponse(response, requestId, operation) {
     throw new Error("接口未返回图片数据，请检查模型权限或请求参数。");
   }
 
-  return {
-    image: item.b64_json ? `data:image/png;base64,${item.b64_json}` : item.url,
-    revisedPrompt: item.revised_prompt || null
-  };
+  const savedImage = await saveProviderImage({
+    item,
+    outputDirectory: await getGeneratedImageDirectory()
+  });
+  return { image: savedImage.imageUrl, revisedPrompt: item.revised_prompt || null };
 }
 
 app.get("/api/health", (_req, res) => {
   res.json({ configured: Boolean(process.env.SUDOCODE_API_KEY), baseUrl: apiBase });
+});
+
+app.get("/generated-images/:fileName", async (req, res, next) => {
+  if (!isSafeGeneratedImageFileName(req.params.fileName)) {
+    res.sendStatus(404);
+    return;
+  }
+  try {
+    const root = await getGeneratedImageDirectory();
+    res.sendFile(req.params.fileName, { root, dotfiles: "deny" }, (error) => {
+      if (!error) return;
+      if (error.code === "ENOENT" || error.status === 404) {
+        res.sendStatus(404);
+        return;
+      }
+      next(error);
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 const clientEvents = new Set([

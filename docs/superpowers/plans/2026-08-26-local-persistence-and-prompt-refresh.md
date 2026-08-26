@@ -108,7 +108,7 @@ git commit -m "功能：保存生成图片到桌面"
 - Produces: 图片 API 的 image 字段为 /generated-images/<server-file>.png。
 - Produces: GET /generated-images/:fileName，仅响应服务端规则生成的 PNG。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("rejects traversal and non-PNG generated-image paths", () => {
@@ -118,13 +118,13 @@ test("rejects traversal and non-PNG generated-image paths", () => {
 });
 ~~~
 
-- [ ] **Step 2: 验证新增断言失败**
+- [x] **Step 2: 验证新增断言失败**
 
 Run: node --test server/generated-image-store.test.mjs
 
 Expected: FAIL，直到文件名白名单实现。
 
-- [ ] **Step 3: 让 generate/edit 统一保存结果并提供受控路由**
+- [x] **Step 3: 让 generate/edit 统一保存结果并提供受控路由**
 
 ~~~js
 const generatedImageDirectory = await getDesktopAppDirectory();
@@ -132,13 +132,13 @@ const generatedImageDirectory = await getDesktopAppDirectory();
 // 路由先校验 isSafeGeneratedImageFileName，再使用 res.sendFile(fileName, { root: generatedImageDirectory, dotfiles: "deny" })。
 ~~~
 
-- [ ] **Step 4: 运行服务端回归测试**
+- [x] **Step 4: 运行服务端回归测试**
 
 Run: node --test server/*.test.mjs
 
 Expected: PASS，包含尺寸、上传限制和图片落盘测试。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add server/index.mjs server/generated-image-store.test.mjs

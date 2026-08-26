@@ -9,8 +9,15 @@ const executeFile = promisify(execFile);
 export async function getDesktopAppDirectory({
   executeFileImpl = executeFile,
   platform = process.platform,
-  homeDirectory = os.homedir()
+  homeDirectory = os.homedir(),
+  outputDirectory = process.env.IMAGE_ASSISTANT_STORAGE_DIR
 } = {}) {
+  if (outputDirectory) {
+    const directory = path.resolve(outputDirectory);
+    await mkdir(directory, { recursive: true });
+    return directory;
+  }
+
   let desktopDirectory = path.join(homeDirectory, "Desktop");
 
   if (platform === "win32") {
