@@ -22,7 +22,7 @@
 - 深浅主题切换与基础交互动效。
 - 今日提示词热榜：内置 17 条复杂中文提示词，按日期稳定随机展示 6 条，点击条目可填入提示词输入框。
 
-## 已确认待实现：本地图片持久化
+## 已完成：本地图片持久化
 
 ### 目标
 
@@ -51,7 +51,7 @@
 - 本地静态图片路由不能访问目标目录之外的文件。
 - 写入失败会返回可读错误，不返回临时 URL。
 
-## 已确认待实现：今日提示词热榜刷新与模型补充
+## 已完成：今日提示词热榜刷新与模型补充
 
 ### 产品交互
 
@@ -72,14 +72,14 @@
 ### 文本模型接口
 
 - 图片模型 `gpt-image-2` 不能默认当作文本模型使用。
-- 新增独立环境变量，例如：
+- 新增独立环境变量：
 
   ```ini
   SUDOCODE_TEXT_MODEL=
   ```
 
-- 在确认供应商支持的文本模型名称和兼容端点前，不实现真实调用。预期采用服务端 `POST /api/prompts/generate`，前端绝不直接携带 API Key。
-- 预计调用 OpenAI 兼容的 `/chat/completions`；实际端点和响应格式必须根据所选服务商文档验证。
+- 服务端通过 `POST /api/prompts/generate` 调用文本模型，前端绝不携带 API Key；未配置该变量时会返回明确错误，本地刷新仍可用。
+- 使用 OpenAI 兼容的 `/chat/completions`，模型名称与接口兼容性仍需按供应商文档配置和验证。
 - 模型提示词要求严格返回 JSON 数组，共 6 项：
 
   ```json
@@ -99,9 +99,9 @@
 ### 缓存策略
 
 - 经校验的模型提示词写入 `<Desktop>\\Image-Assisant\\prompt-cache.json`。
-- 应采用原子写入或临时文件后替换，避免中断导致 JSON 损坏。
-- 服务启动或首次请求时加载缓存，合并到内置提示词池；缓存重复项忽略。
-- 建议限制缓存容量，例如最多保留 120 条，按创建时间淘汰最早条目，防止文件无限增长。
+- 缓存通过临时文件和原子替换写入，避免中断导致 JSON 损坏。
+- 页面启动时通过 `GET /api/prompts` 加载缓存，成功生成后立即合并到当前热榜池；缓存重复项忽略。
+- 缓存最多保留 120 条最新内容，防止文件无限增长。
 - 本阶段不需要后台抓取、实时爬取或数据库。
 
 ### 建议测试
@@ -118,9 +118,12 @@
 - `src/prompt-hotlist.test.mjs`：热榜数据与随机规则测试。
 - `src/prompt-hotlist-ui.test.mjs`：热榜和预览相关 UI 结构测试。
 - `server/index.mjs`：Express API、上游图片请求、上传校验与日志。
+- `server/desktop-path.mjs`、`server/generated-image-store.mjs`：系统桌面路径、生成图落盘和受控文件访问。
+- `server/prompt-cache.mjs`、`server/prompt-generator.mjs`：文本提示词校验、缓存和模型调用。
 - `server/image-sizes.mjs`：服务端允许的图片尺寸。
 - `server/upload-limits.mjs`：参考图数量及大小限制。
 - `.env.example`：环境变量示例。
+- `vite.config.ts`：开发环境中 `/api` 和 `/generated-images` 的本地服务代理。
 - `docs/今日提示词热榜.md`：现有静态提示词内容说明。
 - `docs/后续方向.md`：较长期的产品方向；MinIO 相关条目不再是当前持久化方案。
 

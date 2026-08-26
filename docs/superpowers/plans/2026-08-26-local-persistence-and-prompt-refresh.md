@@ -279,7 +279,7 @@ git commit -m "功能：支持生成热榜新灵感"
 - Consumes: POST /api/prompts/generate 的 { prompts }。
 - Produces: handleGeneratePromptIdeas(): Promise<void>。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("renders the model ideas action with a duplicate-request guard", () => {
@@ -290,13 +290,13 @@ test("renders the model ideas action with a duplicate-request guard", () => {
 });
 ~~~
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: node --test src/prompt-hotlist-ui.test.mjs
 
 Expected: FAIL，生成处理函数与加载状态尚不存在。
 
-- [ ] **Step 3: 实现按钮、加载态、成功合并和失败反馈**
+- [x] **Step 3: 实现按钮、加载态、成功合并和失败反馈**
 
 ~~~tsx
 async function handleGeneratePromptIdeas() {
@@ -311,14 +311,14 @@ async function handleGeneratePromptIdeas() {
 // “生成新灵感”在 loading 时 disabled；普通刷新仍保持可用。
 ~~~
 
-- [ ] **Step 4: 更新 HANDOFF.md 并运行全量验证**
+- [x] **Step 4: 更新 HANDOFF.md 并运行全量验证**
 
 Run: npm test
 Run: npm run build
 
 Expected: 两条命令退出码为 0。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ~~~bash
 git add src/App.tsx src/styles.css src/prompt-hotlist-ui.test.mjs HANDOFF.md

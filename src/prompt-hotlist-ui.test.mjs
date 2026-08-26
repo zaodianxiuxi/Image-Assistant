@@ -8,7 +8,7 @@ test("renders the daily prompt hotlist and fills the selected prompt", async () 
 
   assert.match(source, /from "\.\/prompt-hotlist\.mjs"/);
   assert.match(source, /今日提示词热榜/);
-  assert.match(source, /getDailyPromptHotlist\(new Date\(\), 6, hotlistRefreshIndex\)/);
+  assert.match(source, /getDailyPromptHotlist\(new Date\(\), 6, hotlistRefreshIndex, extraPrompts\)/);
   assert.match(source, /onClick=\{\(\) => setPrompt\(item\.prompt\)\}/);
   assert.match(declaration, /export function getDailyPromptHotlist/);
 });
@@ -21,6 +21,18 @@ test("provides an icon-only local refresh action for the prompt hotlist", async 
   assert.match(source, /aria-label="刷新今日提示词"/);
   assert.match(source, /setHotlistRefreshIndex\(\(value\) => value \+ 1\)/);
   assert.match(styles, /\.hotlist-refresh/);
+});
+
+test("provides a guarded action to generate and merge new prompt ideas", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /handleGeneratePromptIdeas/);
+  assert.match(source, /promptIdeasLoading/);
+  assert.match(source, /\/api\/prompts\/generate/);
+  assert.match(source, /disabled=\{promptIdeasLoading\}/);
+  assert.match(source, /\/api\/prompts/);
+  assert.match(styles, /\.hotlist-generate/);
 });
 
 test("opens generated and history images in a resilient preview with a saved theme", async () => {
