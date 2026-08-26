@@ -33,6 +33,8 @@ test("provides a guarded action to generate and merge new prompt ideas", async (
   assert.match(source, /disabled=\{promptIdeasLoading\}/);
   assert.match(source, /\/api\/prompts/);
   assert.match(styles, /\.hotlist-generate/);
+  assert.match(source, /promptIdeasStatus/);
+  assert.match(source, /role="status"/);
 });
 
 test("opens generated and history images in a resilient preview with a saved theme", async () => {
@@ -58,4 +60,16 @@ test("keeps complete thumbnails visible and frames the result image inside the c
   assert.match(styles, /\.history-item img \{[^}]*object-fit: contain/);
   assert.match(styles, /\.result-preview-trigger \{[^}]*padding: clamp\(24px, 5vw, 72px\)/);
   assert.match(styles, /\.result-preview-trigger img \{[^}]*max-width: min\(100%, 900px\)[^}]*max-height: min\(100%, 620px\)/);
+});
+
+test("groups saved images by series and puts legacy records in 其他", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /const groupedHistory = useMemo\(\(\) =>/);
+  assert.match(source, /const key = item\.seriesName \|\| "其他"/);
+  assert.match(source, /className="gallery-groups"/);
+  assert.match(source, /className="gallery-group"/);
+  assert.match(styles, /\.gallery-groups \{[^}]*gap: 22px/);
+  assert.match(styles, /\.gallery-group-heading/);
 });

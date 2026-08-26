@@ -4,7 +4,8 @@ const SYSTEM_PROMPT = [
   "你是一名中文 AI 图像提示词编辑。",
   "只返回 JSON 对象，格式为 {\\\"prompts\\\":[...] }。",
   "生成恰好 6 条复杂且互不重复的中文图像提示词。",
-  "每项必须有 title、category、size、prompt；size 只能是 1024x1024、1536x864 或 864x1536，prompt 长度为 80 到 500 个字符。"
+  "每项必须有 title、category、size、prompt；size 只能是 1024x1024、1536x864 或 864x1536，prompt 长度为 80 到 500 个字符。",
+  "prompt 只写画面主体、环境、动作、材质、光影、构图和风格等内容，不要写任何画幅、比例或尺寸信息（例如 1:1、16:9、9:16）。"
 ].join("");
 
 function parseModelContent(body) {

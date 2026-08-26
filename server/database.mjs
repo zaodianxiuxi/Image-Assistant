@@ -1,0 +1,315 @@
+import mysql from "mysql2/promise";
+
+let pool;
+let initialization;
+
+export function isDatabaseConfigured() {
+  return Boolean(process.env.MYSQL_HOST && process.env.MYSQL_DATABASE && process.env.MYSQL_USER);
+}
+
+export async function getDatabase() {
+  if (!isDatabaseConfigured()) return null;
+  if (!initialization) {
+    initialization = (async () => {
+      pool = mysql.createPool({
+        host: process.env.MYSQL_HOST,
+        port: Number(process.env.MYSQL_PORT || 3306),
+        user: process.env.MYSQL_USER,
+        password: process.env.MYSQL_PASSWORD || "",
+        database: process.env.MYSQL_DATABASE,
+        waitForConnections: true,
+        connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 5),
+        charset: "utf8mb4"
+      });
+      await migrateDatabase(pool);
+      return pool;
+    })().catch((error) => {
+      initialization = undefined;
+      pool = undefined;
+      throw error;
+    });
+  }
+  return initialization;
+}
+
+export async function closeDatabase() {
+  if (pool) await pool.end();
+  pool = undefined;
+  initialization = undefined;
+}
+
+async function migrateDatabase(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS prompt_collections (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      name VARCHAR(120) NOT NULL,
+      description TEXT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_prompt_collections_updated (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS prompts (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      collection_id BIGINT UNSIGNED NULL,
+      title VARCHAR(160) NOT NULL,
+      category VARCHAR(80) NOT NULL DEFAULT '未分类',
+      content TEXT NOT NULL,
+      negative_prompt TEXT NULL,
+      tags JSON NULL,
+      favorite TINYINT(1) NOT NULL DEFAULT 0,
+      source ENUM('manual','ai','hotlist') NOT NULL DEFAULT 'manual',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_prompts_collection (collection_id),
+      INDEX idx_prompts_category (category),
+      INDEX idx_prompts_favorite (favorite),
+      CONSTRAINT fk_prompts_collection FOREIGN KEY (collection_id) REFERENCES prompt_collections(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS series (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      name VARCHAR(120) NOT NULL,
+      description TEXT NULL,
+      global_prompt TEXT NULL,
+      style_prompt TEXT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_series_updated (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS series_nodes (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      series_id BIGINT UNSIGNED NOT NULL,
+      node_order INT UNSIGNED NOT NULL,
+      title VARCHAR(160) NOT NULL,
+      story_text TEXT NULL,
+      prompt TEXT NULL,
+      status ENUM('draft','generating','completed','failed') NOT NULL DEFAULT 'draft',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_series_node_order (series_id, node_order),
+      INDEX idx_nodes_series (series_id, node_order),
+      CONSTRAINT fk_nodes_series FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS image_records (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      prompt_id BIGINT UNSIGNED NULL,
+      series_id BIGINT UNSIGNED NULL,
+      node_id BIGINT UNSIGNED NULL,
+      title VARCHAR(160) NULL,
+      file_name VARCHAR(180) NOT NULL,
+      relative_path VARCHAR(420) NOT NULL,
+      file_path VARCHAR(900) NOT NULL,
+      public_url VARCHAR(900) NOT NULL,
+      prompt_snapshot TEXT NOT NULL,
+      model VARCHAR(120) NOT NULL,
+      size VARCHAR(30) NOT NULL,
+      operation ENUM('generate','edit') NOT NULL,
+      provider_request_id VARCHAR(180) NULL,
+      status ENUM('completed','failed') NOT NULL DEFAULT 'completed',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_images_created (created_at),
+      INDEX idx_images_series_node (series_id, node_id),
+      CONSTRAINT fk_images_prompt FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE SET NULL,
+      CONSTRAINT fk_images_series FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE SET NULL,
+      CONSTRAINT fk_images_node FOREIGN KEY (node_id) REFERENCES series_nodes(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+function toPrompt(row) {
+  return {
+    id: row.id,
+    collectionId: row.collection_id,
+    title: row.title,
+    category: row.category,
+    content: row.content,
+    negativePrompt: row.negative_prompt,
+    tags: typeof row.tags === "string" ? JSON.parse(row.tags || "[]") : row.tags || [],
+    favorite: Boolean(row.favorite),
+    source: row.source,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export async function listPrompts({ search = "", favorite } = {}) {
+  const database = await getDatabase();
+  if (!database) return [];
+  const values = [];
+  const clauses = [];
+  if (search.trim()) {
+    clauses.push("(title LIKE ? OR content LIKE ? OR category LIKE ?)");
+    const value = "%" + search.trim() + "%";
+    values.push(value, value, value);
+  }
+  if (favorite === true) clauses.push("favorite = 1");
+  const [rows] = await database.query(
+    "SELECT * FROM prompts " + (clauses.length ? "WHERE " + clauses.join(" AND ") : "") + " ORDER BY updated_at DESC, id DESC",
+    values
+  );
+  return rows.map(toPrompt);
+}
+
+export async function upsertPrompt(input, id = null) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法保存提示词。");
+  const values = [
+    String(input.title || "").trim(),
+    String(input.category || "未分类").trim(),
+    String(input.content || "").trim(),
+    input.negativePrompt ? String(input.negativePrompt).trim() : null,
+    JSON.stringify(Array.isArray(input.tags) ? input.tags : []),
+    input.favorite ? 1 : 0,
+    input.source === "ai" || input.source === "hotlist" ? input.source : "manual",
+    input.collectionId || null
+  ];
+  if (id) {
+    await database.query(
+      "UPDATE prompts SET title=?, category=?, content=?, negative_prompt=?, tags=?, favorite=?, source=?, collection_id=? WHERE id=?",
+      [...values, id]
+    );
+    const [rows] = await database.query("SELECT * FROM prompts WHERE id=?", [id]);
+    return rows[0] ? toPrompt(rows[0]) : null;
+  }
+  const [result] = await database.query(
+    "INSERT INTO prompts (title, category, content, negative_prompt, tags, favorite, source, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    values
+  );
+  const [rows] = await database.query("SELECT * FROM prompts WHERE id=?", [result.insertId]);
+  return toPrompt(rows[0]);
+}
+
+export async function deletePrompt(id) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法删除提示词。");
+  await database.query("DELETE FROM prompts WHERE id=?", [id]);
+}
+
+export async function saveGeneratedImage(record) {
+  const database = await getDatabase();
+  if (!database) return null;
+  const [result] = await database.query(
+    "INSERT INTO image_records (prompt_id, series_id, node_id, title, file_name, relative_path, file_path, public_url, prompt_snapshot, model, size, operation, provider_request_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')",
+    [
+      record.promptId || null,
+      record.seriesId || null,
+      record.nodeId || null,
+      record.title || null,
+      record.fileName,
+      record.relativePath,
+      record.filePath,
+      record.publicUrl,
+      record.prompt,
+      record.model || "gpt-image-2",
+      record.size,
+      record.operation || "generate",
+      record.providerRequestId || null
+    ]
+  );
+  return Number(result.insertId);
+}
+
+export async function listGeneratedImages(limit = 60) {
+  const database = await getDatabase();
+  if (!database) return [];
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 60, 200));
+  const [rows] = await database.query(
+    "SELECT i.id, i.title, i.file_name, i.relative_path, i.public_url, i.prompt_snapshot, i.operation, i.created_at, i.series_id, s.name AS series_name FROM image_records i LEFT JOIN series s ON s.id = i.series_id WHERE i.status='completed' ORDER BY i.created_at DESC, i.id DESC LIMIT " + safeLimit
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    fileName: row.file_name,
+    relativePath: row.relative_path,
+    image: row.public_url,
+    prompt: row.prompt_snapshot,
+    kind: row.operation,
+    seriesId: row.series_id,
+    seriesName: row.series_name,
+    createdAt: row.created_at
+  }));
+}
+
+export async function listSeries() {
+  const database = await getDatabase();
+  if (!database) return [];
+  const [rows] = await database.query("SELECT * FROM series ORDER BY updated_at DESC, id DESC");
+  return rows;
+}
+
+export async function createSeries(input) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法保存系列。");
+  const [result] = await database.query(
+    "INSERT INTO series (name, description, global_prompt, style_prompt) VALUES (?, ?, ?, ?)",
+    [String(input.name || "").trim(), input.description || null, input.globalPrompt || null, input.stylePrompt || null]
+  );
+  const [rows] = await database.query("SELECT * FROM series WHERE id=?", [result.insertId]);
+  return rows[0];
+}
+
+export async function listSeriesNodes(seriesId) {
+  const database = await getDatabase();
+  if (!database) return [];
+  const [rows] = await database.query("SELECT * FROM series_nodes WHERE series_id=? ORDER BY node_order", [seriesId]);
+  return rows;
+}
+
+export async function createSeriesNode(seriesId, input) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法保存故事节点。");
+  const [result] = await database.query(
+    "INSERT INTO series_nodes (series_id, node_order, title, story_text, prompt) VALUES (?, ?, ?, ?, ?)",
+    [seriesId, Number(input.nodeOrder), String(input.title || "").trim(), input.storyText || null, input.prompt || null]
+  );
+  const [rows] = await database.query("SELECT * FROM series_nodes WHERE id=?", [result.insertId]);
+  return rows[0];
+}
+
+export async function createStoryboardNodes(seriesId, nodes) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法保存故事分镜。");
+  const connection = await database.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [existing] = await connection.query("SELECT COUNT(*) AS count FROM series_nodes WHERE series_id=?", [seriesId]);
+    if (Number(existing[0]?.count || 0) > 0) {
+      throw new Error("该系列已有故事节点，请新建系列后再自动拆分。");
+    }
+    for (const node of nodes) {
+      await connection.query(
+        "INSERT INTO series_nodes (series_id, node_order, title, story_text, prompt) VALUES (?, ?, ?, ?, ?)",
+        [seriesId, Number(node.nodeOrder), node.title, node.storyText, node.prompt]
+      );
+    }
+    await connection.commit();
+    const [rows] = await connection.query("SELECT * FROM series_nodes WHERE series_id=? ORDER BY node_order", [seriesId]);
+    return rows;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+export async function updateSeriesNodeStatus(nodeId, status) {
+  const database = await getDatabase();
+  if (!database || !Number.isInteger(Number(nodeId))) return;
+  await database.query(
+    "UPDATE series_nodes SET status=? WHERE id=?",
+    [status === "completed" || status === "failed" || status === "generating" ? status : "draft", Number(nodeId)]
+  );
+}

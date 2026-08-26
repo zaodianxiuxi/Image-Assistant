@@ -63,7 +63,11 @@ before(async () => {
       SUDOCODE_API_KEY: "test-key",
       SUDOCODE_BASE_URL: `http://127.0.0.1:${providerPort}`,
       SUDOCODE_TEXT_MODEL: "test-text-model",
-      IMAGE_ASSISTANT_STORAGE_DIR: outputDirectory
+      IMAGE_ASSISTANT_STORAGE_DIR: outputDirectory,
+      MYSQL_HOST: "",
+      MYSQL_DATABASE: "",
+      MYSQL_USER: "",
+      MYSQL_PASSWORD: ""
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -85,7 +89,8 @@ test("returns a locally served URL after saving a generated image", async () => 
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.match(body.image, /^\/generated-images\/\d{8}-\d{6}-.+\.png$/);
+  assert.match(body.image, /^\/generated-images\/\d{4}-\d{2}-\d{2}\/.+\.png$/);
+  assert.equal(body.fileName, "测试本地持久化.png");
   const imageResponse = await fetch(`${baseUrl}${body.image}`);
   assert.equal(await imageResponse.text(), "persisted image");
 });

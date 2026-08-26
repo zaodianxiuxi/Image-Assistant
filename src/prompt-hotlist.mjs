@@ -150,16 +150,31 @@ function dedupePrompts(prompts) {
   });
 }
 
+function removeAspectRatios(prompt) {
+  return typeof prompt === "string"
+    ? prompt
+      .replace(/(?:画幅|比例|宽高比)?(?:为|是)?\s*(?:1:1|16:9|9:16)/gu, "")
+      .replace(/([，,、；;])\s*([。.!！!?])/gu, "$2")
+      .replace(/[，,、；;]\s*$/u, "")
+      .trim()
+    : prompt;
+}
+
 export function getDailyPromptHotlist(date = new Date(), count = 6, refreshIndex = 0, extraPrompts = []) {
   // The refresh index creates a new stable order without turning refresh into a network request.
   const dateKey = `${date.toISOString().slice(0, 10)}:${Math.max(0, Math.floor(refreshIndex))}`;
   const random = seededRandom(hashDate(dateKey));
-  const prompts = dedupePrompts([...extraPrompts, ...PROMPT_HOTLIST]);
+  const incoming = dedupePrompts(extraPrompts).map((item) => ({ ...item, prompt: removeAspectRatios(item.prompt) }));
+  const incomingText = new Set(incoming.map((item) => item.prompt));
+  const base = dedupePrompts(PROMPT_HOTLIST)
+    .filter((item) => !incomingText.has(item.prompt))
+    .map((item) => ({ ...item, prompt: removeAspectRatios(item.prompt) }));
 
-  for (let index = prompts.length - 1; index > 0; index -= 1) {
+  for (let index = base.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
-    [prompts[index], prompts[swapIndex]] = [prompts[swapIndex], prompts[index]];
+    [base[index], base[swapIndex]] = [base[swapIndex], base[index]];
   }
 
-  return prompts.slice(0, Math.max(1, Math.min(count, prompts.length)));
+  const limit = Math.max(1, Math.min(count, incoming.length + base.length));
+  return [...incoming, ...base].slice(0, limit);
 }

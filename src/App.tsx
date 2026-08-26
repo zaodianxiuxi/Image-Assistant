@@ -7,13 +7,16 @@ import {
   Clock3,
   Download,
   Eraser,
+  FolderKanban,
   ImagePlus,
   LoaderCircle,
   Moon,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   Sun,
+  Trash2,
   Upload,
   WandSparkles,
   X
@@ -31,10 +34,22 @@ type ReferenceImage = {
 type Result = {
   id: string;
   src: string;
+  fileName?: string;
+  seriesId?: number | null;
+  seriesName?: string | null;
   prompt: string;
   kind: Mode;
   createdAt: Date;
 };
+type LibraryPrompt = {
+  id: number;
+  title: string;
+  category: string;
+  content: string;
+  favorite: boolean;
+};
+type SeriesRecord = { id: number; name: string; description?: string; global_prompt?: string; style_prompt?: string };
+type SeriesNode = { id: number; series_id: number; node_order: number; title: string; story_text?: string; prompt?: string; status: string };
 
 const SIZES = [
   { value: "1024x1024", name: "正方形", detail: "1:1" },
@@ -43,6 +58,7 @@ const SIZES = [
 ];
 
 const MAX_REFERENCE_IMAGES = 10;
+const STORYBOARD_STYLE_PREFIX = "写实、现实质感的东方志怪电影摄影风格，古代中国环境，可信的人物比例和材质，统一角色外貌、服装、时代与光影，不要卡通、插画或现代物品。";
 function getInitialTheme(): Theme {
   const savedTheme = window.localStorage.getItem("image-assistant-theme");
   if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
@@ -89,6 +105,7 @@ function App() {
   const [maskPreview, setMaskPreview] = useState("");
   const [current, setCurrent] = useState<Result | null>(null);
   const [history, setHistory] = useState<Result[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [preview, setPreview] = useState<Result | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [failedImageSources, setFailedImageSources] = useState<Set<string>>(() => new Set());
@@ -102,6 +119,25 @@ function App() {
   const [hotlistRefreshIndex, setHotlistRefreshIndex] = useState(0);
   const [extraPrompts, setExtraPrompts] = useState<PromptHotlistItem[]>([]);
   const [promptIdeasLoading, setPromptIdeasLoading] = useState(false);
+  const [promptIdeasStatus, setPromptIdeasStatus] = useState("");
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryPrompts, setLibraryPrompts] = useState<LibraryPrompt[]>([]);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryStatus, setLibraryStatus] = useState("");
+  const [seriesOpen, setSeriesOpen] = useState(false);
+  const [seriesList, setSeriesList] = useState<SeriesRecord[]>([]);
+  const [activeSeries, setActiveSeries] = useState<SeriesRecord | null>(null);
+  const [seriesNodes, setSeriesNodes] = useState<SeriesNode[]>([]);
+  const [activeNode, setActiveNode] = useState<SeriesNode | null>(null);
+  const [seriesStatus, setSeriesStatus] = useState("");
+  const [newSeriesName, setNewSeriesName] = useState("");
+  const [newNodeTitle, setNewNodeTitle] = useState("");
+  const [storyText, setStoryText] = useState("");
+  const [storyboardLoading, setStoryboardLoading] = useState(false);
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState("");
+  const [activityStatus, setActivityStatus] = useState("准备就绪，可以开始创作。");
+  const [activityTone, setActivityTone] = useState<"idle" | "working" | "success" | "error">("idle");
   const sourceInput = useRef<HTMLInputElement>(null);
   const maskInput = useRef<HTMLInputElement>(null);
   const inputLogged = useRef(false);
@@ -121,6 +157,35 @@ function App() {
         if (Array.isArray(data.prompts)) setExtraPrompts((items) => mergePromptItems(data.prompts, items));
       })
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/library/images?limit=60")
+      .then(async (response) => response.ok ? response.json() : { images: [] })
+      .then((data) => {
+        if (!Array.isArray(data.images)) return;
+        const savedResults: Result[] = data.images.map((item: { id: number; image: string; fileName?: string; prompt?: string; kind?: string; seriesId?: number | null; seriesName?: string | null; createdAt?: string }) => ({
+          id: "db-" + item.id,
+          src: item.image,
+          fileName: item.fileName,
+          seriesId: item.seriesId,
+          seriesName: item.seriesName,
+          prompt: item.prompt || item.fileName || "已保存图片",
+          kind: item.kind === "edit" ? "edit" : "generate",
+          createdAt: new Date(item.createdAt || Date.now())
+        }));
+        setHistory((items) => {
+          const merged = [...items, ...savedResults];
+          const seen = new Set<string>();
+          return merged.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          }).slice(0, 60);
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => setHistoryLoading(false));
   }, []);
 
   useEffect(() => () => {
@@ -161,6 +226,16 @@ function App() {
     () => new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date()),
     []
   );
+  const groupedHistory = useMemo(() => {
+    const groups = new Map<string, { title: string; items: Result[] }>();
+    history.forEach((item) => {
+      const key = item.seriesName || "其他";
+      const group = groups.get(key) || { title: key, items: [] };
+      group.items.push(item);
+      groups.set(key, group);
+    });
+    return Array.from(groups.values());
+  }, [history]);
 
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
@@ -188,6 +263,9 @@ function App() {
     if (promptIdeasLoading) return;
     setPromptIdeasLoading(true);
     setError("");
+    setPromptIdeasStatus("正在请求文本模型生成 6 条新灵感...");
+    setActivityStatus("已开始生成新灵感，正在请求文本模型...");
+    setActivityTone("working");
     try {
       const response = await fetch("/api/prompts/generate", { method: "POST" });
       if (!response.ok) throw new Error(await readApiError(response));
@@ -196,10 +274,273 @@ function App() {
       // New entries lead the session list while cached entries remain available after reload.
       setExtraPrompts((items) => mergePromptItems(data.prompts, items));
       setHotlistRefreshIndex((value) => value + 1);
+      setActivityStatus("新灵感生成成功，已保存并显示在提示词列表顶部。");
+      setActivityTone("success");
+      setPromptIdeasStatus(`已生成 ${data.prompts.length} 条新灵感，已显示在提示词列表顶部。`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "生成新灵感失败，请稍后重试。");
+      const message = caught instanceof Error ? caught.message : "生成新灵感失败，请稍后重试。";
+      setError(message);
+      setActivityStatus("新灵感生成失败，请查看错误信息。");
+      setActivityTone("error");
+      setPromptIdeasStatus(`生成失败：${message}`);
     } finally {
       setPromptIdeasLoading(false);
+    }
+  }
+
+  async function loadLibraryPrompts(search = librarySearch) {
+    setLibraryStatus("正在读取提示词库...");
+    try {
+      const response = await fetch("/api/library/prompts?search=" + encodeURIComponent(search));
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setLibraryPrompts(Array.isArray(data.prompts) ? data.prompts : []);
+      setLibraryStatus("已加载 " + (Array.isArray(data.prompts) ? data.prompts.length : 0) + " 条提示词。");
+    } catch (caught) {
+      setLibraryStatus(caught instanceof Error ? caught.message : "读取提示词库失败。");
+    }
+  }
+
+  async function saveCurrentPrompt() {
+    if (!prompt.trim()) {
+      setLibraryStatus("当前没有可保存的提示词。");
+      return;
+    }
+    setLibraryStatus("正在保存提示词...");
+    try {
+      const response = await fetch("/api/library/prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: prompt.trim().slice(0, 12), category: "未分类", content: prompt.trim(), source: "manual" })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      await loadLibraryPrompts();
+      setLibraryStatus("提示词已保存到 MySQL。");
+    } catch (caught) {
+      setLibraryStatus(caught instanceof Error ? caught.message : "保存提示词失败。");
+    }
+  }
+
+  async function removeLibraryPrompt(id: number) {
+    try {
+      const response = await fetch("/api/library/prompts/" + id, { method: "DELETE" });
+      if (!response.ok) throw new Error(await readApiError(response));
+      setLibraryPrompts((items) => items.filter((item) => item.id !== id));
+      setLibraryStatus("提示词已删除。");
+    } catch (caught) {
+      setLibraryStatus(caught instanceof Error ? caught.message : "删除提示词失败。");
+    }
+  }
+
+  async function loadSeries() {
+    setSeriesStatus("正在读取系列...");
+    try {
+      const response = await fetch("/api/series");
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setSeriesList(Array.isArray(data.series) ? data.series : []);
+      setSeriesStatus("已加载 " + (Array.isArray(data.series) ? data.series.length : 0) + " 个系列。");
+    } catch (caught) {
+      setSeriesStatus(caught instanceof Error ? caught.message : "读取系列失败。");
+    }
+  }
+
+  async function createNewSeries() {
+    if (!newSeriesName.trim()) {
+      setSeriesStatus("请输入系列名称。");
+      return;
+    }
+    setSeriesStatus("正在创建系列...");
+    try {
+      const response = await fetch("/api/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newSeriesName.trim() })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setSeriesList((items) => [data.series, ...items]);
+      setActiveSeries(data.series);
+      setNewSeriesName("");
+      setSeriesNodes([]);
+      setSeriesStatus("系列已创建。");
+    } catch (caught) {
+      setSeriesStatus(caught instanceof Error ? caught.message : "创建系列失败。");
+    }
+  }
+
+  async function selectSeries(series: SeriesRecord) {
+    setActiveSeries(series);
+    setSeriesStatus("正在读取故事节点...");
+    try {
+      const response = await fetch("/api/series/" + series.id + "/nodes");
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setSeriesNodes(Array.isArray(data.nodes) ? data.nodes : []);
+      setActiveNode(null);
+      setSeriesStatus("系列已选中。");
+    } catch (caught) {
+      setSeriesStatus(caught instanceof Error ? caught.message : "读取故事节点失败。");
+    }
+  }
+
+  async function createNewNode() {
+    if (!activeSeries) {
+      setSeriesStatus("请先选择一个系列。");
+      return;
+    }
+    if (!newNodeTitle.trim()) {
+      setSeriesStatus("请输入节点名称。");
+      return;
+    }
+    setSeriesStatus("正在创建故事节点...");
+    try {
+      const response = await fetch("/api/series/" + activeSeries.id + "/nodes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nodeOrder: seriesNodes.length + 1,
+          title: newNodeTitle.trim(),
+          prompt: prompt.trim() || null
+        })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setSeriesNodes((items) => [...items, data.node]);
+      setActiveNode(data.node);
+      setNewNodeTitle("");
+      setSeriesStatus("故事节点已创建。");
+    } catch (caught) {
+      setSeriesStatus(caught instanceof Error ? caught.message : "创建故事节点失败。");
+    }
+  }
+
+  async function createStoryboard() {
+    if (!activeSeries) {
+      setSeriesStatus("请先创建并选择一个系列。");
+      return;
+    }
+    if (!storyText.trim()) {
+      setSeriesStatus("请输入故事原文或故事梗概。");
+      return;
+    }
+    setStoryboardLoading(true);
+    setSeriesStatus("正在使用文本模型拆分故事节点...");
+    setActivityStatus("已开始拆分故事，正在请求文本模型...");
+    setActivityTone("working");
+    try {
+      const response = await fetch("/api/series/" + activeSeries.id + "/storyboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story: storyText.trim() })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setSeriesNodes(Array.isArray(data.nodes) ? data.nodes : []);
+      setActiveNode(null);
+      setSeriesStatus("故事已拆分为 " + (Array.isArray(data.nodes) ? data.nodes.length : 0) + " 个连续节点。");
+      setActivityStatus("故事拆分成功，已生成 " + (Array.isArray(data.nodes) ? data.nodes.length : 0) + " 个节点。");
+      setActivityTone("success");
+    } catch (caught) {
+      setSeriesStatus(caught instanceof Error ? caught.message : "自动拆分故事失败。");
+      setActivityStatus("故事拆分失败，请查看错误信息。");
+      setActivityTone("error");
+    } finally {
+      setStoryboardLoading(false);
+    }
+  }
+
+  async function generateStoryboardImages() {
+    if (!activeSeries || !seriesNodes.length || batchGenerating) {
+      setBatchProgress(activeSeries ? "请先生成故事节点。" : "请先选择一个系列。");
+      setActivityStatus(activeSeries ? "未开始：请先自动拆分故事生成节点。" : "未开始：请先选择一个系列。");
+      setActivityTone("error");
+      return;
+    }
+    setBatchGenerating(true);
+    setBatchProgress("正在准备批量生成...");
+    setActivityStatus("批量任务已开始，正在准备第 1 张图片...");
+    setActivityTone("working");
+    const generated: Result[] = [];
+    const failures: string[] = [];
+    const warnings: string[] = [];
+    let previousImage: { blob: Blob; fileName: string } | null = null;
+    try {
+      for (let index = 0; index < seriesNodes.length; index += 1) {
+        const node = seriesNodes[index];
+        const nodePrompt = STORYBOARD_STYLE_PREFIX + " " + (node.prompt || node.story_text || node.title);
+        setBatchProgress("正在生成第 " + (index + 1) + " / " + seriesNodes.length + " 张：" + node.title + (previousImage ? "，正在引用上一节点图片。" : ""));
+        setActivityStatus("批量生成中：第 " + (index + 1) + " / " + seriesNodes.length + " 张，" + node.title + (previousImage ? "（已引用上一节点图片）" : ""));
+        try {
+          let response: Response;
+          const operation: Mode = previousImage ? "edit" : "generate";
+          if (previousImage) {
+            const form = new FormData();
+            form.append("prompt", nodePrompt);
+            form.append("size", size);
+            form.append("title", node.title);
+            form.append("seriesName", activeSeries.name);
+            form.append("seriesId", String(activeSeries.id));
+            form.append("nodeId", String(node.id));
+            form.append("nodeOrder", String(node.node_order));
+            form.append("image[]", previousImage.blob, previousImage.fileName);
+            response = await fetch("/api/images/edit", { method: "POST", body: form });
+          } else {
+            response = await fetch("/api/images/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: nodePrompt,
+                size,
+                title: node.title,
+                seriesName: activeSeries.name,
+                seriesId: activeSeries.id,
+                nodeId: node.id,
+                nodeOrder: node.node_order
+              })
+            });
+          }
+          if (!response.ok) throw new Error(await readApiError(response));
+          const data = await response.json();
+          generated.push({
+            id: data.databaseId ? "db-" + data.databaseId : crypto.randomUUID(),
+            src: data.image,
+            fileName: data.fileName,
+            seriesId: activeSeries.id,
+            seriesName: activeSeries.name,
+            prompt: data.revisedPrompt || nodePrompt,
+            kind: operation,
+            createdAt: new Date()
+          });
+          const imageResponse = await fetch(data.image);
+          if (imageResponse.ok) {
+            previousImage = { blob: await imageResponse.blob(), fileName: data.fileName || ("node-" + node.node_order + ".png") };
+          } else {
+            previousImage = null;
+            warnings.push(node.title + "：无法读取图片作为下一节点参考图，下一张将按普通生成处理");
+          }
+        } catch (caught) {
+          failures.push(node.title + "：" + (caught instanceof Error ? caught.message : "请求失败"));
+        }
+      }
+      if (generated.length) {
+        setCurrent(generated.at(-1) || null);
+        setHistory((items) => [...generated.reverse(), ...items].slice(0, 60));
+      }
+      const nodesResponse = await fetch("/api/series/" + activeSeries.id + "/nodes");
+      if (nodesResponse.ok) {
+        const nodesData = await nodesResponse.json();
+        if (Array.isArray(nodesData.nodes)) setSeriesNodes(nodesData.nodes);
+      }
+      setBatchProgress("批量生成完成：成功 " + generated.length + " 张，失败 " + failures.length + " 张。" + (failures.length ? " 失败节点：" + failures.join("；") : "") + (warnings.length ? " 提示：" + warnings.join("；") : ""));
+      setActivityStatus("批量生成完成：成功 " + generated.length + " 张，失败 " + failures.length + " 张。");
+      setActivityTone(failures.length ? "error" : "success");
+    } catch (caught) {
+      setBatchProgress("批量生成已停止：" + (caught instanceof Error ? caught.message : "请求失败。"));
+      setActivityStatus("批量生成异常终止，请查看错误信息。");
+      setActivityTone("error");
+    } finally {
+      setBatchGenerating(false);
     }
   }
 
@@ -298,17 +639,23 @@ function App() {
     event.preventDefault();
     if (!prompt.trim()) {
       setError(mode === "generate" ? "先描述你想要生成的图片。" : "描述希望如何编辑图片。" );
+      setActivityStatus("未开始：请先填写提示词。");
+      setActivityTone("error");
       logClientEvent("client_validation_failed", { promptChars: 0 });
       return;
     }
     if (mode === "edit" && !referenceImages.length) {
       setError("图片编辑需要至少上传一张原图。" );
+      setActivityStatus("未开始：编辑模式至少需要一张图片。");
+      setActivityTone("error");
       logClientEvent("client_validation_failed", { promptChars: prompt.trim().length });
       return;
     }
 
     setLoading(true);
     setError("");
+    setActivityStatus("已开始生成，正在校验请求...");
+    setActivityTone("working");
     setExecutionStage("validating");
     setRequestStartedAt(Date.now());
     const operation: Mode = referenceImages.length ? "edit" : "generate";
@@ -323,45 +670,81 @@ function App() {
       let response: Response;
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       setExecutionStage("sending");
+      setActivityStatus(operation === "edit" ? "已开始上传参考图，正在发送请求..." : "已开始发送提示词，正在连接图片服务...");
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       if (operation === "generate") {
         const request = fetch("/api/images/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, size })
+          body: JSON.stringify({
+            prompt,
+            size,
+            title: activeNode?.title || undefined,
+            seriesName: activeSeries?.name || undefined,
+            seriesId: activeSeries?.id || undefined,
+            nodeId: activeNode?.id || undefined,
+            nodeOrder: activeNode?.node_order || undefined
+          })
         });
         setExecutionStage("processing");
+        setActivityStatus("图片模型正在生成，请稍候...");
         response = await request;
       } else {
         const form = new FormData();
         form.append("prompt", prompt);
         form.append("size", size);
+        if (activeNode?.title) form.append("title", activeNode.title);
+        if (activeSeries?.name) form.append("seriesName", activeSeries.name);
+        if (activeSeries?.id) form.append("seriesId", String(activeSeries.id));
+        if (activeNode?.id) form.append("nodeId", String(activeNode.id));
+        if (activeNode?.node_order) form.append("nodeOrder", String(activeNode.node_order));
         referenceImages.forEach((image) => form.append("image[]", image.file));
         if (maskFile) form.append("mask", maskFile);
         const request = fetch("/api/images/edit", { method: "POST", body: form });
         setExecutionStage("processing");
+        setActivityStatus("图片模型正在根据参考图生成，请稍候...");
         response = await request;
       }
 
       if (!response.ok) throw new Error(await readApiError(response));
       const data = await response.json();
       const result: Result = {
-        id: crypto.randomUUID(),
+        id: data.databaseId ? "db-" + data.databaseId : crypto.randomUUID(),
         src: data.image,
+        fileName: data.fileName,
+        seriesId: activeSeries?.id,
+        seriesName: activeSeries?.name,
         prompt: data.revisedPrompt || prompt,
         kind: operation,
         createdAt: new Date()
       };
       setCurrent(result);
-      setHistory((items) => [result, ...items].slice(0, 8));
+      setHistory((items) => [result, ...items].slice(0, 60));
       setApiReady(true);
       setExecutionStage("completed");
+      setActivityStatus("生成成功，图片已保存到桌面文件夹。");
+      setActivityTone("success");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "图片请求失败，请稍后重试。" );
       setExecutionStage("failed");
+      setActivityStatus("生成失败，请查看错误信息和终端日志。");
+      setActivityTone("error");
     } finally {
       setLoading(false);
     }
+  }
+
+  function renderHistoryItem(item: Result) {
+    return (
+      <article className="history-item" key={item.id}>
+        <button type="button" onClick={() => { setCurrent(item); openPreview(item); }} aria-label={"预览生成记录：" + item.prompt}>
+          {failedImageSources.has(item.src)
+            ? <span className="history-image-error">图片加载失败</span>
+            : <img key={item.id + "-" + (imageRetries[item.src] || 0)} src={getImageSource(item.src)} data-image-source={item.src} alt={item.prompt} onError={handleImageError} />}
+        </button>
+        <div><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={item.fileName || "image-assistant.png"} /></div>
+      </article>
+    );
   }
 
   const sourceTitle = mode === "generate" ? "添加参考图（可选）" : "上传待编辑图片";
@@ -384,6 +767,12 @@ function App() {
           <span>Image Assistant</span>
         </a>
         <div className="topbar-actions">
+          <button className="icon-button" type="button" onClick={() => { setLibraryOpen(true); void loadLibraryPrompts(); }} title="提示词库" aria-label="打开提示词库">
+            <Search size={17} />
+          </button>
+          <button className="icon-button" type="button" onClick={() => { setSeriesOpen(true); void loadSeries(); }} title="系列创作" aria-label="打开系列创作">
+            <FolderKanban size={17} />
+          </button>
           <button
             className="icon-button theme-toggle"
             type="button"
@@ -402,6 +791,11 @@ function App() {
           </span>
         </div>
       </header>
+      <div className={"activity-banner " + activityTone} role="status" aria-live="polite">
+        {(loading || promptIdeasLoading || storyboardLoading || batchGenerating) && <LoaderCircle className="spin" size={15} />}
+        {!(loading || promptIdeasLoading || storyboardLoading || batchGenerating) && activityTone === "success" && <CheckCircle2 size={15} />}
+        <span>{activityStatus}</span>
+      </div>
 
       <section className="workspace" aria-label="图片生成工作台">
         <aside className="control-panel">
@@ -451,7 +845,7 @@ function App() {
                 )}
             </div>
 
-            <label className="field-label" htmlFor="prompt">提示词</label>
+            <div className="field-label-row"><label className="field-label" htmlFor="prompt">提示词</label><button className="save-prompt-button" type="button" onClick={saveCurrentPrompt} title="保存到提示词库"><Plus size={13} /> 保存</button></div>
             <div className="prompt-box">
               <textarea id="prompt" value={prompt} onChange={(event) => handlePromptChange(event.target.value)} placeholder={referenceImages.length || mode === "edit" ? "描述希望保留或修改什么，例如：把天空换成黄昏..." : "描述你想生成的画面、风格和细节..."} rows={7} />
               <span>{prompt.length} / 4000</span>
@@ -486,7 +880,10 @@ function App() {
                 <button
                   className="hotlist-refresh"
                   type="button"
-                  onClick={() => setHotlistRefreshIndex((value) => value + 1)}
+                  onClick={() => {
+                    setHotlistRefreshIndex((value) => value + 1);
+                    setPromptIdeasStatus("已刷新今日提示词。");
+                  }}
                   title="刷新今日提示词"
                   aria-label="刷新今日提示词"
                 >
@@ -503,6 +900,7 @@ function App() {
                 </button>
               </div>
             </div>
+            {promptIdeasStatus && <p className={`hotlist-status ${promptIdeasLoading ? "is-loading" : ""}`} role="status" aria-live="polite">{promptIdeasStatus}</p>}
             <div className="hotlist-list">
               {dailyPrompts.map((item, index) => (
                 <button key={item.id} type="button" className="hotlist-item" onClick={() => setPrompt(item.prompt)}>
@@ -517,7 +915,7 @@ function App() {
         <section className="canvas-panel">
           <div className="canvas-heading">
             <div><span className="eyebrow">输出</span><h1>{current ? "最新生成结果" : "创作画布"}</h1></div>
-            {current && <DownloadButton src={current.src} />}
+            {current && <DownloadButton src={current.src} filename={current.fileName || "image-assistant.png"} />}
           </div>
           <div className={`canvas ${current ? "has-result" : ""}`}>
             {loading ? (
@@ -548,17 +946,58 @@ function App() {
       </section>
 
       <section className="history-section">
-        <div className="history-heading"><div><span className="eyebrow">本次会话</span><h2>生成记录</h2></div>{history.length > 0 && <span>{history.length} 张图片</span>}</div>
+        <div className="history-heading"><div><span className="eyebrow">本地图库</span><h2>图片合集</h2></div>{historyLoading ? <span>正在读取</span> : history.length > 0 && <span>{history.length} 张图片</span>}</div>
           {history.length ? (
-            <div className="history-grid">
-            {history.map((item) => <article className="history-item" key={item.id}><button type="button" onClick={() => { setCurrent(item); openPreview(item); }} aria-label={`预览生成记录：${item.prompt}`}>{failedImageSources.has(item.src) ? <span className="history-image-error">图片加载失败</span> : <img key={`${item.id}-${imageRetries[item.src] || 0}`} src={getImageSource(item.src)} data-image-source={item.src} alt={item.prompt} onError={handleImageError} />}</button><div><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={`image-${item.id}.png`} /></div></article>)}
+            <div className="gallery-groups">
+              {groupedHistory.map((group) => (
+                <section className="gallery-group" key={group.title}>
+                  <div className="gallery-group-heading"><strong>{group.title}</strong><span>{group.items.length} 张</span></div>
+                  <div className="history-grid">{group.items.map(renderHistoryItem)}</div>
+                </section>
+              ))}
             </div>
         ) : (
-          <div className="history-empty"><Clock3 size={18} /> 生成的图片会保留在此浏览器会话中。</div>
+          <div className="history-empty"><Clock3 size={18} /> 还没有已保存的图片。</div>
         )}
       </section>
 
-      <footer><span>Powered by gpt-image-2</span><span>图片仅在当前浏览器会话中保留</span></footer>
+      <footer><span>Powered by gpt-image-2</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
+      {libraryOpen && (
+        <div className="manager-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setLibraryOpen(false); }}>
+          <section className="manager-dialog" role="dialog" aria-modal="true" aria-label="提示词库">
+            <div className="manager-toolbar"><strong>提示词库</strong><button className="icon-button" type="button" onClick={() => setLibraryOpen(false)} title="关闭提示词库" aria-label="关闭提示词库"><X size={18} /></button></div>
+            <div className="manager-body">
+              <div className="manager-search"><Search size={15} /><input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadLibraryPrompts(); }} placeholder="搜索标题、分类或内容" /><button type="button" onClick={() => void loadLibraryPrompts()}>搜索</button></div>
+              <div className="manager-actions"><button type="button" onClick={saveCurrentPrompt}><Plus size={14} /> 保存当前提示词</button><span role="status">{libraryStatus}</span></div>
+              <div className="library-list">
+                {libraryPrompts.map((item) => <article className="library-item" key={item.id}><button type="button" className="library-content" onClick={() => { setPrompt(item.content); setLibraryOpen(false); }}><strong>{item.title}</strong><small>{item.category}</small><p>{item.content}</p></button><button type="button" className="icon-button small" onClick={() => void removeLibraryPrompt(item.id)} title="删除提示词" aria-label={"删除提示词：" + item.title}><Trash2 size={14} /></button></article>)}
+                {!libraryPrompts.length && <p className="manager-empty">暂无已保存提示词。可以先保存当前提示词。</p>}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+      {seriesOpen && (
+        <div className="manager-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSeriesOpen(false); }}>
+          <section className="manager-dialog" role="dialog" aria-modal="true" aria-label="系列创作">
+            <div className="manager-toolbar"><strong>系列创作</strong><button className="icon-button" type="button" onClick={() => setSeriesOpen(false)} title="关闭系列创作" aria-label="关闭系列创作"><X size={18} /></button></div>
+            <div className="manager-body series-manager">
+              <div className="manager-search"><input value={newSeriesName} onChange={(event) => setNewSeriesName(event.target.value)} placeholder="新系列名称" /><button type="button" onClick={() => void createNewSeries()}><Plus size={14} /> 创建系列</button></div>
+              {activeSeries && <div className="storyboard-form"><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="粘贴志怪故事原文或故事梗概，程序会自动拆分成连续画面节点。" rows={5} /><div><button type="button" onClick={() => void createStoryboard()} disabled={storyboardLoading || seriesNodes.length > 0}>{storyboardLoading ? <LoaderCircle className="spin" size={14} /> : <WandSparkles size={14} />}{storyboardLoading ? "正在拆分" : "自动拆分故事"}</button><button type="button" onClick={() => void generateStoryboardImages()} disabled={batchGenerating || !seriesNodes.length}>{batchGenerating ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}{batchGenerating ? "正在批量生成" : "批量生成图片"}</button></div></div>}
+              <div className="series-layout">
+                <div className="series-list">{seriesList.map((series) => <button type="button" key={series.id} className={activeSeries?.id === series.id ? "series-entry active" : "series-entry"} onClick={() => void selectSeries(series)}><strong>{series.name}</strong><small>系列 #{series.id}</small></button>)}{!seriesList.length && <p className="manager-empty">暂无系列。</p>}</div>
+                <div className="node-panel">
+                  <div className="node-panel-heading"><strong>{activeSeries?.name || "请选择系列"}</strong>{activeSeries && <span>{seriesNodes.length} 个节点</span>}</div>
+                  {activeSeries && <div className="manager-search"><input value={newNodeTitle} onChange={(event) => setNewNodeTitle(event.target.value)} placeholder="新故事节点名称" /><button type="button" onClick={() => void createNewNode()}><Plus size={14} /> 添加节点</button></div>}
+                  <div className="node-list">{seriesNodes.map((node) => <button type="button" key={node.id} className={activeNode?.id === node.id ? "node-entry active" : "node-entry"} onClick={() => { setActiveNode(node); if (node.prompt) setPrompt(node.prompt); setSeriesOpen(false); }}><span>{String(node.node_order).padStart(2, "0")}</span><strong>{node.title}</strong><small>{node.status}</small></button>)}</div>
+                </div>
+              </div>
+              {seriesStatus && <p className="manager-status" role="status">{seriesStatus}</p>}
+              {batchProgress && <p className="manager-status" role="status">{batchProgress}</p>}
+            </div>
+          </section>
+        </div>
+      )}
       {preview && (
         <div className="image-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
           <section className="image-preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">

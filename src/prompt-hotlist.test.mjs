@@ -29,3 +29,17 @@ test("changes the unique hotlist selection when the refresh index changes", () =
   assert.equal(new Set(next).size, 6);
   assert.notDeepEqual(next, first);
 });
+
+test("shows generated prompts first and removes aspect-ratio text", () => {
+  const generated = {
+    id: "generated-example",
+    title: "新生成灵感",
+    category: "场景设计",
+    size: "1536x864",
+    prompt: PROMPT_HOTLIST[0].prompt + "，16:9。"
+  };
+  const visible = getDailyPromptHotlist(new Date("2026-08-26T08:00:00.000Z"), 6, 0, [generated]);
+
+  assert.equal(visible[0].id, generated.id);
+  assert.equal(/1:1|16:9|9:16/.test(visible[0].prompt), false);
+});

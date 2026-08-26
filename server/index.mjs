@@ -7,6 +7,7 @@ import { getDesktopAppDirectory } from "./desktop-path.mjs";
 import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-image-store.mjs";
 import { readPromptCache, validatePromptCandidates, writePromptCache } from "./prompt-cache.mjs";
 import { generatePromptCandidates } from "./prompt-generator.mjs";
+import { generateStoryboard } from "./storyboard-generator.mjs";
 import {
   MAX_FILE_BYTES,
   MAX_REFERENCE_IMAGES,
@@ -15,6 +16,20 @@ import {
 } from "./upload-limits.mjs";
 import { DEFAULT_IMAGE_SIZE, isSupportedImageSize } from "./image-sizes.mjs";
 import { PROMPT_HOTLIST } from "../src/prompt-hotlist.mjs";
+import {
+  createSeries,
+  createSeriesNode,
+  createStoryboardNodes,
+  deletePrompt,
+  isDatabaseConfigured,
+  listPrompts,
+  listGeneratedImages,
+  listSeries,
+  listSeriesNodes,
+  saveGeneratedImage,
+  updateSeriesNodeStatus,
+  upsertPrompt
+} from "./database.mjs";
 
 const app = express();
 const upload = multer({
@@ -72,6 +87,15 @@ function headers() {
   return { Authorization: `Bearer ${process.env.SUDOCODE_API_KEY}` };
 }
 
+async function updateNodeStatus(nodeId, status, requestId) {
+  if (!Number.isInteger(Number(nodeId))) return;
+  try {
+    await updateSeriesNodeStatus(Number(nodeId), status);
+  } catch (error) {
+    log("database_node_status_failed", { requestId, nodeId: Number(nodeId), status, ...errorDetails(error) });
+  }
+}
+
 function getGeneratedImageDirectory() {
   // Resolve once, on demand, so health and validation endpoints remain available if disk setup fails.
   generatedImageDirectoryPromise ??= getDesktopAppDirectory();
@@ -82,7 +106,7 @@ async function getPromptCacheFile() {
   return path.join(await getGeneratedImageDirectory(), "prompt-cache.json");
 }
 
-async function parseProviderResponse(response, requestId, operation) {
+async function parseProviderResponse(response, requestId, operation, metadata = {}) {
   const raw = await response.text();
   let body;
   try {
@@ -120,13 +144,47 @@ async function parseProviderResponse(response, requestId, operation) {
 
   const savedImage = await saveProviderImage({
     item,
-    outputDirectory: await getGeneratedImageDirectory()
+    outputDirectory: await getGeneratedImageDirectory(),
+    title: metadata.title,
+    prompt: metadata.prompt,
+    seriesName: metadata.seriesName,
+    nodeOrder: metadata.nodeOrder
   });
-  return { image: savedImage.imageUrl, revisedPrompt: item.revised_prompt || null };
+  let databaseId = null;
+  try {
+    databaseId = await saveGeneratedImage({
+      title: metadata.title,
+      seriesId: metadata.seriesId,
+      nodeId: metadata.nodeId,
+      fileName: savedImage.fileName,
+      relativePath: savedImage.relativePath,
+      filePath: path.join(await getGeneratedImageDirectory(), savedImage.relativePath),
+      publicUrl: savedImage.imageUrl,
+      prompt: metadata.prompt || item.revised_prompt || "",
+      size: metadata.size,
+      operation,
+      model: "gpt-image-2",
+      providerRequestId: response.headers.get("x-request-id") || response.headers.get("request-id")
+    });
+    await updateNodeStatus(metadata.nodeId, "completed", requestId);
+  } catch (error) {
+    log("database_save_failed", { requestId, operation, ...errorDetails(error) });
+  }
+  return {
+    image: savedImage.imageUrl,
+    fileName: savedImage.fileName,
+    relativePath: savedImage.relativePath,
+    databaseId,
+    revisedPrompt: item.revised_prompt || null
+  };
 }
 
 app.get("/api/health", (_req, res) => {
-  res.json({ configured: Boolean(process.env.SUDOCODE_API_KEY), baseUrl: apiBase });
+  res.json({
+    configured: Boolean(process.env.SUDOCODE_API_KEY),
+    databaseConfigured: isDatabaseConfigured(),
+    baseUrl: apiBase
+  });
 });
 
 app.get("/api/prompts", async (req, res) => {
@@ -134,6 +192,120 @@ app.get("/api/prompts", async (req, res) => {
     res.json({ prompts: await readPromptCache(await getPromptCacheFile()) });
   } catch (error) {
     sendError(req, res, 500, "读取本地提示词缓存失败。", { operation: "prompt_cache", ...errorDetails(error) });
+  }
+});
+
+app.get("/api/library/prompts", async (req, res) => {
+  try {
+    const prompts = await listPrompts({
+      search: typeof req.query.search === "string" ? req.query.search : "",
+      favorite: req.query.favorite === "true"
+    });
+    res.json({ prompts, databaseConfigured: isDatabaseConfigured() });
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "读取提示词失败。", { operation: "prompt_library", ...errorDetails(error) });
+  }
+});
+
+app.get("/api/library/images", async (req, res) => {
+  try {
+    const images = await listGeneratedImages(req.query.limit);
+    res.json({ images, databaseConfigured: isDatabaseConfigured() });
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "读取图片合集失败。", { operation: "image_library", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/library/prompts", async (req, res) => {
+  try {
+    const prompt = await upsertPrompt(req.body || {});
+    res.status(201).json({ prompt });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "保存提示词失败。", { operation: "prompt_library", ...errorDetails(error) });
+  }
+});
+
+app.patch("/api/library/prompts/:id", async (req, res) => {
+  try {
+    const prompt = await upsertPrompt(req.body || {}, Number(req.params.id));
+    if (!prompt) {
+      sendError(req, res, 404, "提示词不存在。", { operation: "prompt_library" });
+      return;
+    }
+    res.json({ prompt });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "更新提示词失败。", { operation: "prompt_library", ...errorDetails(error) });
+  }
+});
+
+app.delete("/api/library/prompts/:id", async (req, res) => {
+  try {
+    await deletePrompt(Number(req.params.id));
+    res.status(204).end();
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "删除提示词失败。", { operation: "prompt_library", ...errorDetails(error) });
+  }
+});
+
+app.get("/api/series", async (req, res) => {
+  try {
+    res.json({ series: await listSeries(), databaseConfigured: isDatabaseConfigured() });
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "读取系列失败。", { operation: "series", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/series", async (req, res) => {
+  try {
+    const series = await createSeries(req.body || {});
+    res.status(201).json({ series });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "保存系列失败。", { operation: "series", ...errorDetails(error) });
+  }
+});
+
+app.get("/api/series/:id/nodes", async (req, res) => {
+  try {
+    res.json({ nodes: await listSeriesNodes(Number(req.params.id)) });
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "读取故事节点失败。", { operation: "series", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/series/:id/nodes", async (req, res) => {
+  try {
+    const node = await createSeriesNode(Number(req.params.id), req.body || {});
+    res.status(201).json({ node });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "保存故事节点失败。", { operation: "series", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/series/:id/storyboard", async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  if (!process.env.SUDOCODE_TEXT_MODEL) {
+    sendError(req, res, 503, "未配置 SUDOCODE_TEXT_MODEL，无法自动拆分故事。", { operation: "storyboard" });
+    return;
+  }
+  try {
+    const seriesId = Number(req.params.id);
+    const allSeries = await listSeries();
+    const series = allSeries.find((item) => Number(item.id) === seriesId);
+    if (!series) {
+      sendError(req, res, 404, "系列不存在。", { operation: "storyboard" });
+      return;
+    }
+    const nodes = await generateStoryboard({
+      apiBase,
+      apiKey: process.env.SUDOCODE_API_KEY,
+      model: process.env.SUDOCODE_TEXT_MODEL,
+      story: req.body?.story,
+      seriesName: series.name
+    });
+    const savedNodes = await createStoryboardNodes(seriesId, nodes);
+    res.status(201).json({ nodes: savedNodes });
+  } catch (error) {
+    sendError(req, res, 502, error instanceof Error ? error.message : "自动拆分故事失败。", { operation: "storyboard", ...errorDetails(error) });
   }
 });
 
@@ -155,6 +327,18 @@ app.post("/api/prompts/generate", async (req, res) => {
     });
     const updatedCache = validatePromptCandidates([...generatedPrompts, ...cachedPrompts], PROMPT_HOTLIST);
     await writePromptCache(cacheFile, updatedCache);
+    if (isDatabaseConfigured()) {
+      try {
+        await Promise.all(generatedPrompts.map((item) => upsertPrompt({
+          title: item.title,
+          category: item.category,
+          content: item.prompt,
+          source: "ai"
+        })));
+      } catch (error) {
+        log("database_prompt_save_failed", { requestId: req.requestId, ...errorDetails(error) });
+      }
+    }
     res.json({ prompts: generatedPrompts });
   } catch (error) {
     const message = error instanceof Error ? error.message : "生成新灵感失败。";
@@ -162,14 +346,33 @@ app.post("/api/prompts/generate", async (req, res) => {
   }
 });
 
-app.get("/generated-images/:fileName", async (req, res, next) => {
-  if (!isSafeGeneratedImageFileName(req.params.fileName)) {
-    res.sendStatus(404);
-    return;
-  }
+app.get(/^\/generated-images\/(.+)$/, async (req, res, next) => {
   try {
+    const rawParts = String(req.params[0] || "").split("/");
+    let parts;
+    try {
+      parts = rawParts.map((part) => decodeURIComponent(part));
+    } catch {
+      res.sendStatus(404);
+      return;
+    }
+    if (!parts.length || parts.some((part) => !part || part === "." || part === ".." || part.includes("/") || part.includes("\\") || part.includes("\u0000"))) {
+      res.sendStatus(404);
+      return;
+    }
+    const fileName = parts.at(-1);
+    if (!isSafeGeneratedImageFileName(fileName) || !/^\d{4}-\d{2}-\d{2}$/u.test(parts[0])) {
+      res.sendStatus(404);
+      return;
+    }
     const root = await getGeneratedImageDirectory();
-    res.sendFile(req.params.fileName, { root, dotfiles: "deny" }, (error) => {
+    const filePath = path.resolve(root, ...parts);
+    const normalizedRoot = path.resolve(root) + path.sep;
+    if (!filePath.startsWith(normalizedRoot)) {
+      res.sendStatus(404);
+      return;
+    }
+    res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
       if (!error) return;
       if (error.code === "ENOENT" || error.status === 404) {
         res.sendStatus(404);
@@ -226,6 +429,7 @@ app.post("/api/images/generate", async (req, res) => {
     sendError(req, res, 400, "请输入图片提示词。");
     return;
   }
+  await updateNodeStatus(req.body?.nodeId, "generating", req.requestId);
 
   log("provider_request", {
     requestId: req.requestId,
@@ -241,8 +445,17 @@ app.post("/api/images/generate", async (req, res) => {
       headers: { ...headers(), "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-2", prompt: prompt.trim(), size: imageSize })
     });
-    res.json(await parseProviderResponse(response, req.requestId, "generate"));
+    res.json(await parseProviderResponse(response, req.requestId, "generate", {
+      prompt: prompt.trim(),
+      size: imageSize,
+      title: typeof req.body?.title === "string" ? req.body.title : undefined,
+      seriesName: typeof req.body?.seriesName === "string" ? req.body.seriesName : undefined,
+      seriesId: Number.isInteger(Number(req.body?.seriesId)) ? Number(req.body.seriesId) : null,
+      nodeId: Number.isInteger(Number(req.body?.nodeId)) ? Number(req.body.nodeId) : null,
+      nodeOrder: Number.isInteger(Number(req.body?.nodeOrder)) ? Number(req.body.nodeOrder) : undefined
+    }));
   } catch (error) {
+    await updateNodeStatus(req.body?.nodeId, "failed", req.requestId);
     const status = Number.isInteger(error?.status) ? error.status : 502;
     const message = error instanceof Error ? error.message : "图片生成失败。";
     sendError(req, res, status, message, { operation: "generate", ...errorDetails(error) });
@@ -273,6 +486,7 @@ app.post(
       sendError(req, res, 400, "请输入编辑提示词。");
       return;
     }
+    await updateNodeStatus(req.body?.nodeId, "generating", req.requestId);
     const uploadFiles = [...images, ...(mask ? [mask] : [])];
     if (!hasUploadSizeWithinLimit(uploadFiles)) {
       sendError(req, res, 413, `图片和遮罩总大小不能超过 ${MAX_UPLOAD_BYTES / 1024 / 1024} MB。`, { operation: "upload" });
@@ -305,8 +519,17 @@ app.post(
         headers: headers(),
         body: form
       });
-      res.json(await parseProviderResponse(response, req.requestId, "edit"));
+      res.json(await parseProviderResponse(response, req.requestId, "edit", {
+        prompt: prompt.trim(),
+        size: imageSize,
+        title: typeof req.body?.title === "string" ? req.body.title : undefined,
+        seriesName: typeof req.body?.seriesName === "string" ? req.body.seriesName : undefined,
+        seriesId: Number.isInteger(Number(req.body?.seriesId)) ? Number(req.body.seriesId) : null,
+        nodeId: Number.isInteger(Number(req.body?.nodeId)) ? Number(req.body.nodeId) : null,
+        nodeOrder: Number.isInteger(Number(req.body?.nodeOrder)) ? Number(req.body.nodeOrder) : undefined
+      }));
     } catch (error) {
+      await updateNodeStatus(req.body?.nodeId, "failed", req.requestId);
       const status = Number.isInteger(error?.status) ? error.status : 502;
       const message = error instanceof Error ? error.message : "图片编辑失败。";
       sendError(req, res, status, message, { operation: "edit", ...errorDetails(error) });

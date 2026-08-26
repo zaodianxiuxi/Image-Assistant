@@ -42,28 +42,30 @@ test("writes base64 and remote provider images as local PNG URLs", async () => {
       item: { b64_json: Buffer.from("base64 image").toString("base64") },
       outputDirectory,
       now,
-      randomUuid: () => "base64-id"
+      prompt: "雨港物流城"
     });
     const remote = await saveProviderImage({
       item: { url: "https://example.test/provider-image.png" },
       outputDirectory,
       now,
-      randomUuid: () => "remote-id",
+      title: "雨港物流城",
       fetchImpl: async (url) => {
         assert.equal(url, "https://example.test/provider-image.png");
         return new Response(Buffer.from("remote image"), { status: 200 });
       }
     });
 
-    assert.match(base64.imageUrl, /^\/generated-images\/\d{8}-\d{6}-base64-id\.png$/);
-    assert.match(remote.imageUrl, /^\/generated-images\/\d{8}-\d{6}-remote-id\.png$/);
-    assert.equal(await readFile(path.join(outputDirectory, base64.fileName), "utf8"), "base64 image");
-    assert.equal(await readFile(path.join(outputDirectory, remote.fileName), "utf8"), "remote image");
+    assert.match(base64.imageUrl, /^\/generated-images\/2026-08-26\/.+\.png$/);
+    assert.match(remote.imageUrl, /^\/generated-images\/2026-08-26\/.+\.png$/);
+    assert.equal(base64.fileName, "雨港物流城.png");
+    assert.equal(remote.fileName, "雨港物流城-2.png");
+    assert.equal(await readFile(path.join(outputDirectory, base64.relativePath), "utf8"), "base64 image");
+    assert.equal(await readFile(path.join(outputDirectory, remote.relativePath), "utf8"), "remote image");
   });
 });
 
 test("accepts only server-generated PNG file names", () => {
-  assert.equal(isSafeGeneratedImageFileName("20260826-083015-a1b2-c3d4.png"), true);
+  assert.equal(isSafeGeneratedImageFileName("雨港物流城.png"), true);
   assert.equal(isSafeGeneratedImageFileName("../.env"), false);
   assert.equal(isSafeGeneratedImageFileName("..%2F.env"), false);
   assert.equal(isSafeGeneratedImageFileName("source.jpg"), false);

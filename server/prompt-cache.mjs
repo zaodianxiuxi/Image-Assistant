@@ -12,6 +12,14 @@ function normalizedText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function removeAspectRatios(value) {
+  return value
+    .replace(/(?:画幅|比例|宽高比)?(?:为|是)?\s*(?:1:1|16:9|9:16)/gu, "")
+    .replace(/([，,、；;])\s*([。.!！!?])/gu, "$2")
+    .replace(/[，,、；;]\s*$/u, "")
+    .trim();
+}
+
 function promptId(prompt) {
   let hash = 2166136261;
   for (const character of prompt) {
@@ -30,7 +38,7 @@ export function validatePromptCandidates(value, existingPrompts = []) {
     const title = normalizedText(item?.title);
     const category = normalizedText(item?.category);
     const size = normalizedText(item?.size);
-    const prompt = normalizedText(item?.prompt);
+    const prompt = removeAspectRatios(normalizedText(item?.prompt));
     const promptLength = Array.from(prompt).length;
     if (
       !title || !category || !prompt ||
