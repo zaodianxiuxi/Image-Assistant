@@ -14,6 +14,17 @@ let providerServer;
 let baseUrl;
 let outputDirectory;
 
+const promptText = "未来港口的中文复杂图像提示词，包含主体、环境、光影、镜头、材质和构图控制。".repeat(4);
+
+function generatedPrompts() {
+  return Array.from({ length: 6 }, (_, index) => ({
+    title: `服务端灵感 ${index + 1}`,
+    category: "未来城市",
+    size: "1536x864",
+    prompt: `${promptText}${index}`
+  }));
+}
+
 async function reservePort() {
   const listener = createNetServer();
   listener.listen(0, "127.0.0.1");
@@ -28,11 +39,17 @@ before(async () => {
   const providerPort = await reservePort();
   const appPort = await reservePort();
   providerServer = createServer((request, response) => {
-    assert.equal(request.url, "/images/generations");
     response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({
-      data: [{ b64_json: Buffer.from("persisted image").toString("base64") }]
-    }));
+    if (request.url === "/images/generations") {
+      response.end(JSON.stringify({ data: [{ b64_json: Buffer.from("persisted image").toString("base64") }] }));
+      return;
+    }
+    if (request.url === "/chat/completions") {
+      response.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ prompts: generatedPrompts() }) } }] }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ error: { message: "unknown endpoint" } }));
   });
   providerServer.listen(providerPort, "127.0.0.1");
   await once(providerServer, "listening");
@@ -45,6 +62,7 @@ before(async () => {
       PORT: String(appPort),
       SUDOCODE_API_KEY: "test-key",
       SUDOCODE_BASE_URL: `http://127.0.0.1:${providerPort}`,
+      SUDOCODE_TEXT_MODEL: "test-text-model",
       IMAGE_ASSISTANT_STORAGE_DIR: outputDirectory
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -75,6 +93,15 @@ test("returns a locally served URL after saving a generated image", async () => 
 test("does not serve a generated-image route with a traversal file name", async () => {
   const response = await fetch(`${baseUrl}/generated-images/..%2F.env`);
   assert.equal(response.status, 404);
+});
+
+test("returns six server-generated prompt ideas through the local API", async () => {
+  const response = await fetch(`${baseUrl}/api/prompts/generate`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.prompts.length, 6);
+  assert.ok(body.prompts.every((item) => item.id.startsWith("generated-")));
 });
 
 test("proxies generated images through the Vite development server", async () => {

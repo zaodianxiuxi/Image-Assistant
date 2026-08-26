@@ -219,7 +219,7 @@ git commit -m "功能：支持刷新今日提示词"
 - Produces: generatePromptCandidates({ apiBase, apiKey, model, fetchImpl }): Promise<PromptItem[]>
 - Produces: POST /api/prompts/generate -> { prompts: PromptItem[] }
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 ~~~js
 test("rejects invalid prompt entries and limits persistent cache entries", async () => {
@@ -230,13 +230,13 @@ test("rejects invalid prompt entries and limits persistent cache entries", async
 });
 ~~~
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: node --test server/prompt-cache.test.mjs server/prompt-generator.test.mjs
 
 Expected: FAIL，新增模块不存在。
 
-- [ ] **Step 3: 实现严格校验和原子缓存**
+- [x] **Step 3: 实现严格校验和原子缓存**
 
 ~~~js
 // 接受 title、category、size、prompt、id；要求中文、非空、80-500 字、允许画幅和内容去重。
@@ -244,7 +244,7 @@ Expected: FAIL，新增模块不存在。
 // 未配置 model 时抛出“未配置 SUDOCODE_TEXT_MODEL，无法生成新灵感。”。
 ~~~
 
-- [ ] **Step 4: 实现 OpenAI 兼容服务端接口**
+- [x] **Step 4: 实现 OpenAI 兼容服务端接口**
 
 ~~~js
 app.post("/api/prompts/generate", async (req, res) => {
@@ -254,13 +254,13 @@ app.post("/api/prompts/generate", async (req, res) => {
 });
 ~~~
 
-- [ ] **Step 5: 更新配置并运行服务端测试**
+- [x] **Step 5: 更新配置并运行服务端测试**
 
 Run: node --test server/*.test.mjs
 
 Expected: PASS，覆盖未配置模型、合法 JSON、非法字段、缓存容量和图片测试。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ~~~bash
 git add server/prompt-cache.mjs server/prompt-cache.test.mjs server/prompt-generator.mjs server/prompt-generator.test.mjs server/image-sizes.mjs server/index.mjs .env.example
