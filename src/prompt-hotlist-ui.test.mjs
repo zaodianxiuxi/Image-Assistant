@@ -86,3 +86,16 @@ test("renders saved images in a series and node hierarchy", async () => {
   assert.match(styles, /\.gallery-node-groups/);
   assert.match(styles, /\.gallery-node-heading/);
 });
+
+test("shows each gallery image prompt and supports collapsing nodes", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /collapsedGalleryNodes/);
+  assert.match(source, /aria-expanded=\{!nodeCollapsed\}/);
+  assert.match(source, /className="gallery-node-toggle"/);
+  assert.match(source, /className="history-prompt"/);
+  assert.match(source, /title=\{item\.prompt\}/);
+  assert.match(styles, /\.gallery-node-toggle/);
+  assert.match(styles, /\.history-prompt/);
+});

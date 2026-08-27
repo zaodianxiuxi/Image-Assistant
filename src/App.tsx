@@ -109,6 +109,7 @@ function App() {
   const [maskPreview, setMaskPreview] = useState("");
   const [current, setCurrent] = useState<Result | null>(null);
   const [history, setHistory] = useState<Result[]>([]);
+  const [collapsedGalleryNodes, setCollapsedGalleryNodes] = useState<Set<string>>(() => new Set());
   const [historyLoading, setHistoryLoading] = useState(true);
   const [preview, setPreview] = useState<Result | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
@@ -616,6 +617,15 @@ function App() {
     setPreview(result);
   }
 
+  function toggleGalleryNode(key: string) {
+    setCollapsedGalleryNodes((collapsed) => {
+      const next = new Set(collapsed);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
     const source = event.currentTarget.dataset.imageSource;
     if (source) setFailedImageSources((sources) => new Set(sources).add(source));
@@ -746,7 +756,8 @@ function App() {
             ? <span className="history-image-error">图片加载失败</span>
             : <img key={item.id + "-" + (imageRetries[item.src] || 0)} src={getImageSource(item.src)} data-image-source={item.src} alt={item.prompt} onError={handleImageError} />}
         </button>
-        <div><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={item.fileName || "image-assistant.png"} /></div>
+        <div className="history-item-meta"><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={item.fileName || "image-assistant.png"} /></div>
+        <p className="history-prompt" title={item.prompt}>{item.prompt}</p>
       </article>
     );
   }
@@ -959,8 +970,22 @@ function App() {
                   <div className="gallery-node-groups">
                     {group.nodes.map((node) => (
                       <section className="gallery-node-group" key={node.key}>
-                        <div className="gallery-node-heading"><strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong><span>{node.items.length} 张</span></div>
-                        <div className="history-grid">{node.items.map(renderHistoryItem)}</div>
+                        {(() => {
+                          const nodeStateKey = `${group.key}:${node.key}`;
+                          const nodeCollapsed = collapsedGalleryNodes.has(nodeStateKey);
+                          return (
+                            <>
+                              <div className="gallery-node-heading">
+                                <button className="gallery-node-toggle" type="button" onClick={() => toggleGalleryNode(nodeStateKey)} aria-expanded={!nodeCollapsed}>
+                                  <ChevronDown size={14} className={nodeCollapsed ? "is-collapsed" : ""} />
+                                  <strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong>
+                                </button>
+                                <span>{node.items.length} 张</span>
+                              </div>
+                              {!nodeCollapsed && <div className="history-grid">{node.items.map(renderHistoryItem)}</div>}
+                            </>
+                          );
+                        })()}
                       </section>
                     ))}
                   </div>
