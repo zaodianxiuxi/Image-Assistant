@@ -26,6 +26,7 @@ import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 import type { PromptHotlistItem } from "./prompt-hotlist.mjs";
 import { groupHistoryRecords } from "./gallery-groups.mjs";
 import { enrichSessionVersion, markSessionDelivery } from "./image-version-session.mjs";
+import StyleWorkbench from "./StyleWorkbench";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -133,6 +134,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [apiReady, setApiReady] = useState<boolean | null>(null);
+  const [databaseConfigured, setDatabaseConfigured] = useState(false);
   const [executionStage, setExecutionStage] = useState<ExecutionStage>("idle");
   const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -145,6 +147,7 @@ function App() {
   const [librarySearch, setLibrarySearch] = useState("");
   const [libraryStatus, setLibraryStatus] = useState("");
   const [seriesOpen, setSeriesOpen] = useState(false);
+  const [styleWorkbenchOpen, setStyleWorkbenchOpen] = useState(false);
   const [seriesList, setSeriesList] = useState<SeriesRecord[]>([]);
   const [activeSeries, setActiveSeries] = useState<SeriesRecord | null>(null);
   const [seriesNodes, setSeriesNodes] = useState<SeriesNode[]>([]);
@@ -166,8 +169,14 @@ function App() {
   useEffect(() => {
     fetch("/api/health")
       .then((response) => response.json())
-      .then((data) => setApiReady(Boolean(data.configured)))
-      .catch(() => setApiReady(false));
+      .then((data) => {
+        setApiReady(Boolean(data.configured));
+        setDatabaseConfigured(Boolean(data.databaseConfigured));
+      })
+      .catch(() => {
+        setApiReady(false);
+        setDatabaseConfigured(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -1005,7 +1014,13 @@ function App() {
                 )}
             </div>
 
-            <div className="field-label-row"><label className="field-label" htmlFor="prompt">提示词</label><button className="save-prompt-button" type="button" onClick={saveCurrentPrompt} title="保存到提示词库"><Plus size={13} /> 保存</button></div>
+            <div className="field-label-row">
+              <label className="field-label" htmlFor="prompt">提示词</label>
+              <div className="prompt-label-actions">
+                <button className="extract-style-button" type="button" onClick={() => setStyleWorkbenchOpen(true)} title="从图片提取风格"><WandSparkles size={13} /> 从图片提取风格</button>
+                <button className="save-prompt-button" type="button" onClick={saveCurrentPrompt} title="保存到提示词库"><Plus size={13} /> 保存</button>
+              </div>
+            </div>
             <div className="prompt-box">
               <textarea id="prompt" value={prompt} onChange={(event) => handlePromptChange(event.target.value)} placeholder={referenceImages.length || mode === "edit" ? "描述希望保留或修改什么，例如：把天空换成黄昏..." : "描述你想生成的画面、风格和细节..."} rows={7} />
               <span>{prompt.length} / 4000</span>
@@ -1179,6 +1194,17 @@ function App() {
           </section>
         </div>
       )}
+      <StyleWorkbench
+        open={styleWorkbenchOpen}
+        databaseConfigured={databaseConfigured}
+        onClose={() => setStyleWorkbenchOpen(false)}
+        onApplyPrompt={(nextPrompt) => {
+          handlePromptChange(nextPrompt);
+          setStyleWorkbenchOpen(false);
+          setActivityStatus("风格提示词已应用，可以继续调整画幅或生成图片。");
+          setActivityTone("success");
+        }}
+      />
       {preview && (
         <div className="image-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
           <section className="image-preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">

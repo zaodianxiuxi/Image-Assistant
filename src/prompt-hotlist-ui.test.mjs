@@ -131,3 +131,23 @@ test("provides a persistent three-theme menu for the full-width workspace", asyn
   assert.match(styles, /\.app-shell \{[^}]*max-width: none/);
   assert.match(styles, /\.workspace \{[^}]*grid-template-columns: 360px/);
 });
+
+test("opens a structured image-to-prompt workbench without automatic generation", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const workbench = await readFile(new URL("./StyleWorkbench.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /从图片提取风格/);
+  assert.match(source, /databaseConfigured/);
+  assert.match(workbench, /\/api\/styles\/analyze/);
+  assert.match(workbench, /\/api\/styles\/compose/);
+  assert.match(workbench, /原图内容/);
+  assert.match(workbench, /构图与画面组织/);
+  assert.match(workbench, /新的画面内容/);
+  assert.match(workbench, /优化组合/);
+  assert.match(workbench, /应用到提示词/);
+  assert.match(workbench, /保存为本地模板/);
+  assert.match(workbench, /连接 MySQL 后可用/);
+  assert.doesNotMatch(workbench, /\/api\/images\/(?:generate|edit)/);
+  assert.match(styles, /\.style-workbench/);
+});
