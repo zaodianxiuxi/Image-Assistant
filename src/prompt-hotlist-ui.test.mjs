@@ -66,10 +66,23 @@ test("groups saved images by series and puts legacy records in 其他", async ()
   const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
-  assert.match(source, /const groupedHistory = useMemo\(\(\) =>/);
-  assert.match(source, /const key = item\.seriesName \|\| "其他"/);
+  assert.match(source, /const groupedHistory = useMemo\(\(\) => groupHistoryRecords\(history\), \[history\]\)/);
   assert.match(source, /className="gallery-groups"/);
   assert.match(source, /className="gallery-group"/);
   assert.match(styles, /\.gallery-groups \{[^}]*gap: 22px/);
   assert.match(styles, /\.gallery-group-heading/);
+});
+
+test("renders saved images in a series and node hierarchy", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /from "\.\/gallery-groups\.mjs"/);
+  assert.match(source, /groupHistoryRecords\(history\)/);
+  assert.match(source, /group\.nodes\.map/);
+  assert.match(source, /className="gallery-node-groups"/);
+  assert.match(source, /className="gallery-node-group"/);
+  assert.match(source, /node\.items\.map\(renderHistoryItem\)/);
+  assert.match(styles, /\.gallery-node-groups/);
+  assert.match(styles, /\.gallery-node-heading/);
 });

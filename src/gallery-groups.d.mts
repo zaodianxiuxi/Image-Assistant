@@ -9,19 +9,19 @@ export type GalleryHistoryRecord = {
   [key: string]: unknown;
 };
 
-export type GalleryNodeGroup = {
+export type GalleryNodeGroup<T extends GalleryHistoryRecord = GalleryHistoryRecord> = {
   key: string;
   title: string;
   nodeId: number | null;
   nodeOrder: number | null;
-  items: GalleryHistoryRecord[];
+  items: T[];
 };
 
-export type GalleryGroup = {
+export type GalleryGroup<T extends GalleryHistoryRecord = GalleryHistoryRecord> = {
   key: string;
   title: string;
   seriesId: number | null;
-  nodes: GalleryNodeGroup[];
+  nodes: GalleryNodeGroup<T>[];
 };
 
-export function groupHistoryRecords(records?: GalleryHistoryRecord[]): GalleryGroup[];
+export function groupHistoryRecords<T extends GalleryHistoryRecord>(records?: T[]): GalleryGroup<T>[];

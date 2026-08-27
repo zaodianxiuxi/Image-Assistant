@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 import type { PromptHotlistItem } from "./prompt-hotlist.mjs";
+import { groupHistoryRecords } from "./gallery-groups.mjs";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -232,16 +233,7 @@ function App() {
     () => new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date()),
     []
   );
-  const groupedHistory = useMemo(() => {
-    const groups = new Map<string, { title: string; items: Result[] }>();
-    history.forEach((item) => {
-      const key = item.seriesName || "其他";
-      const group = groups.get(key) || { title: key, items: [] };
-      group.items.push(item);
-      groups.set(key, group);
-    });
-    return Array.from(groups.values());
-  }, [history]);
+  const groupedHistory = useMemo(() => groupHistoryRecords(history), [history]);
 
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
@@ -962,9 +954,16 @@ function App() {
           {history.length ? (
             <div className="gallery-groups">
               {groupedHistory.map((group) => (
-                <section className="gallery-group" key={group.title}>
-                  <div className="gallery-group-heading"><strong>{group.title}</strong><span>{group.items.length} 张</span></div>
-                  <div className="history-grid">{group.items.map(renderHistoryItem)}</div>
+                <section className="gallery-group" key={group.key}>
+                  <div className="gallery-group-heading"><strong>{group.title}</strong><span>{group.nodes.reduce((total, node) => total + node.items.length, 0)} 张</span></div>
+                  <div className="gallery-node-groups">
+                    {group.nodes.map((node) => (
+                      <section className="gallery-node-group" key={node.key}>
+                        <div className="gallery-node-heading"><strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong><span>{node.items.length} 张</span></div>
+                        <div className="history-grid">{node.items.map(renderHistoryItem)}</div>
+                      </section>
+                    ))}
+                  </div>
                 </section>
               ))}
             </div>
