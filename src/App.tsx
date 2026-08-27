@@ -37,6 +37,9 @@ type Result = {
   fileName?: string;
   seriesId?: number | null;
   seriesName?: string | null;
+  nodeId?: number | null;
+  nodeTitle?: string | null;
+  nodeOrder?: number | null;
   prompt: string;
   kind: Mode;
   createdAt: Date;
@@ -164,12 +167,15 @@ function App() {
       .then(async (response) => response.ok ? response.json() : { images: [] })
       .then((data) => {
         if (!Array.isArray(data.images)) return;
-        const savedResults: Result[] = data.images.map((item: { id: number; image: string; fileName?: string; prompt?: string; kind?: string; seriesId?: number | null; seriesName?: string | null; createdAt?: string }) => ({
+        const savedResults: Result[] = data.images.map((item: { id: number; image: string; fileName?: string; prompt?: string; kind?: string; seriesId?: number | null; seriesName?: string | null; nodeId?: number | null; nodeTitle?: string | null; nodeOrder?: number | null; createdAt?: string }) => ({
           id: "db-" + item.id,
           src: item.image,
           fileName: item.fileName,
           seriesId: item.seriesId,
           seriesName: item.seriesName,
+          nodeId: item.nodeId,
+          nodeTitle: item.nodeTitle,
+          nodeOrder: item.nodeOrder,
           prompt: item.prompt || item.fileName || "已保存图片",
           kind: item.kind === "edit" ? "edit" : "generate",
           createdAt: new Date(item.createdAt || Date.now())
@@ -508,6 +514,9 @@ function App() {
             fileName: data.fileName,
             seriesId: activeSeries.id,
             seriesName: activeSeries.name,
+            nodeId: node.id,
+            nodeTitle: node.title,
+            nodeOrder: node.node_order,
             prompt: data.revisedPrompt || nodePrompt,
             kind: operation,
             createdAt: new Date()
@@ -714,6 +723,9 @@ function App() {
         fileName: data.fileName,
         seriesId: activeSeries?.id,
         seriesName: activeSeries?.name,
+        nodeId: activeNode?.id,
+        nodeTitle: activeNode?.title,
+        nodeOrder: activeNode?.node_order,
         prompt: data.revisedPrompt || prompt,
         kind: operation,
         createdAt: new Date()

@@ -225,7 +225,7 @@ export async function listGeneratedImages(limit = 60) {
   if (!database) return [];
   const safeLimit = Math.max(1, Math.min(Number(limit) || 60, 200));
   const [rows] = await database.query(
-    "SELECT i.id, i.title, i.file_name, i.relative_path, i.public_url, i.prompt_snapshot, i.operation, i.created_at, i.series_id, s.name AS series_name FROM image_records i LEFT JOIN series s ON s.id = i.series_id WHERE i.status='completed' ORDER BY i.created_at DESC, i.id DESC LIMIT " + safeLimit
+    "SELECT i.id, i.title, i.file_name, i.relative_path, i.public_url, i.prompt_snapshot, i.operation, i.created_at, i.series_id, s.name AS series_name, i.node_id, n.title AS node_title, n.node_order FROM image_records i LEFT JOIN series s ON s.id = i.series_id LEFT JOIN series_nodes n ON n.id = i.node_id WHERE i.status='completed' ORDER BY i.created_at DESC, i.id DESC LIMIT " + safeLimit
   );
   return rows.map((row) => ({
     id: row.id,
@@ -237,6 +237,9 @@ export async function listGeneratedImages(limit = 60) {
     kind: row.operation,
     seriesId: row.series_id,
     seriesName: row.series_name,
+    nodeId: row.node_id,
+    nodeTitle: row.node_title,
+    nodeOrder: row.node_order,
     createdAt: row.created_at
   }));
 }
