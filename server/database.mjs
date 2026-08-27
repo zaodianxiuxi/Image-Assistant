@@ -1,5 +1,3 @@
-import mysql from "mysql2/promise";
-
 let pool;
 let initialization;
 
@@ -11,6 +9,7 @@ export async function getDatabase() {
   if (!isDatabaseConfigured()) return null;
   if (!initialization) {
     initialization = (async () => {
+      const { default: mysql } = await import("mysql2/promise");
       pool = mysql.createPool({
         host: process.env.MYSQL_HOST,
         port: Number(process.env.MYSQL_PORT || 3306),
