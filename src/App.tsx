@@ -11,6 +11,7 @@ import {
   ImagePlus,
   LoaderCircle,
   Moon,
+  Palette,
   Plus,
   RefreshCw,
   Search,
@@ -28,7 +29,7 @@ import { enrichSessionVersion, markSessionDelivery } from "./image-version-sessi
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "studio";
 type ReferenceImage = {
   file: File;
   preview: string;
@@ -70,9 +71,14 @@ const SIZES = [
 
 const MAX_REFERENCE_IMAGES = 10;
 const STORYBOARD_STYLE_PREFIX = "写实、现实质感的东方志怪电影摄影风格，古代中国环境，可信的人物比例和材质，统一角色外貌、服装、时代与光影，不要卡通、插画或现代物品。";
+const THEME_OPTIONS: Array<{ value: Theme; label: string; description: string }> = [
+  { value: "light", label: "明亮工作台", description: "清晰、轻快的日常创作界面" },
+  { value: "dark", label: "深色专业", description: "减少长时间看图的亮度干扰" },
+  { value: "studio", label: "暖灰编辑室", description: "更适合判断图片色彩和质感" }
+];
 function getInitialTheme(): Theme {
   const savedTheme = window.localStorage.getItem("image-assistant-theme");
-  if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "studio") return savedTheme;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -121,6 +127,7 @@ function App() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [preview, setPreview] = useState<Result | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [failedImageSources, setFailedImageSources] = useState<Set<string>>(() => new Set());
   const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -227,6 +234,15 @@ function App() {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [preview]);
+
+  useEffect(() => {
+    if (!themeMenuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setThemeMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [themeMenuOpen]);
 
   useEffect(() => {
     if (!loading || !requestStartedAt) {
@@ -895,15 +911,37 @@ function App() {
           <button className="icon-button" type="button" onClick={() => { setSeriesOpen(true); void loadSeries(); }} title="系列创作" aria-label="打开系列创作">
             <FolderKanban size={17} />
           </button>
-          <button
-            className="icon-button theme-toggle"
-            type="button"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            title={theme === "light" ? "切换深色主题" : "切换浅色主题"}
-            aria-label={theme === "light" ? "切换深色主题" : "切换浅色主题"}
-          >
-            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
-          </button>
+          <div className="theme-picker">
+            <button
+              className="icon-button theme-toggle"
+              type="button"
+              onClick={() => setThemeMenuOpen((open) => !open)}
+              title="切换界面主题"
+              aria-label="切换界面主题"
+              aria-expanded={themeMenuOpen}
+              aria-haspopup="menu"
+            >
+              {theme === "light" ? <Sun size={17} /> : theme === "dark" ? <Moon size={17} /> : <Palette size={17} />}
+            </button>
+            {themeMenuOpen && (
+              <div className="theme-menu" role="menu" aria-label="界面主题">
+                {THEME_OPTIONS.map((option) => (
+                  <button
+                    className={theme === option.value ? "active" : ""}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={theme === option.value}
+                    key={option.value}
+                    onClick={() => { setTheme(option.value); setThemeMenuOpen(false); }}
+                  >
+                    <span className={"theme-swatch " + option.value} />
+                    <span><strong>{option.label}</strong><small>{option.description}</small></span>
+                    {theme === option.value && <CheckCircle2 size={15} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <a href="https://sudocode.chat/docs/image-api" target="_blank" rel="noreferrer" className="docs-link">
             API 文档 <ArrowUpRight size={14} />
           </a>

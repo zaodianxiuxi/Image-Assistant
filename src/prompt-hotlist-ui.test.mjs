@@ -115,3 +115,19 @@ test("connects history images to editing and delivery-version actions", async ()
   assert.match(styles, /\.history-edit-button/);
   assert.match(styles, /\.delivery-badge/);
 });
+
+test("provides a persistent three-theme menu for the full-width workspace", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /type Theme = "light" \| "dark" \| "studio"/);
+  assert.match(source, /themeMenuOpen/);
+  assert.match(source, /className="theme-menu"/);
+  assert.match(source, /明亮工作台/);
+  assert.match(source, /深色专业/);
+  assert.match(source, /暖灰编辑室/);
+  assert.match(styles, /--surface-page:/);
+  assert.match(styles, /:root\[data-theme="studio"\]/);
+  assert.match(styles, /\.app-shell \{[^}]*max-width: none/);
+  assert.match(styles, /\.workspace \{[^}]*grid-template-columns: 360px/);
+});
