@@ -8,6 +8,8 @@ import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-ima
 import { readPromptCache, validatePromptCandidates, writePromptCache } from "./prompt-cache.mjs";
 import { generatePromptCandidates } from "./prompt-generator.mjs";
 import { generateStoryboard } from "./storyboard-generator.mjs";
+import { analyzeImageStyle } from "./style-analyzer.mjs";
+import { composeStylePrompt } from "./style-composer.mjs";
 import {
   MAX_FILE_BYTES,
   MAX_REFERENCE_IMAGES,
@@ -375,6 +377,53 @@ app.post("/api/prompts/generate", async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "生成新灵感失败。";
     sendError(req, res, 502, message, { operation: "prompt_generate", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/styles/analyze", upload.single("image"), async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  if (!process.env.SUDOCODE_VISION_MODEL) {
+    sendError(req, res, 503, "未配置 SUDOCODE_VISION_MODEL，无法分析参考图。", { operation: "style_analyze" });
+    return;
+  }
+  if (!req.file || !req.file.mimetype.startsWith("image/")) {
+    sendError(req, res, 400, "请上传一张有效的参考图片。", { operation: "style_analyze" });
+    return;
+  }
+  try {
+    const analysis = await analyzeImageStyle({
+      apiBase,
+      apiKey: process.env.SUDOCODE_API_KEY,
+      model: process.env.SUDOCODE_VISION_MODEL,
+      image: req.file
+    });
+    res.json({ analysis });
+  } catch (error) {
+    sendError(req, res, 502, error instanceof Error ? error.message : "参考图分析失败。", {
+      operation: "style_analyze",
+      ...errorDetails(error)
+    });
+  }
+});
+
+app.post("/api/styles/compose", async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  try {
+    const prompt = await composeStylePrompt({
+      apiBase,
+      apiKey: process.env.SUDOCODE_API_KEY,
+      model: process.env.SUDOCODE_TEXT_MODEL,
+      fallbackModel: process.env.SUDOCODE_VISION_MODEL,
+      analysis: req.body?.analysis,
+      newContent: req.body?.newContent,
+      lockedFields: req.body?.lockedFields
+    });
+    res.json({ prompt });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "提示词组合失败。", {
+      operation: "style_compose",
+      ...errorDetails(error)
+    });
   }
 });
 

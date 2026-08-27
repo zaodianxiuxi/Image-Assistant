@@ -23,7 +23,8 @@ server/           Express 本地 API 代理
 ```powershell
 Copy-Item .env.example .env
 # 编辑 .env，填入 SUDOCODE_API_KEY
-# 如需生成热榜新灵感，再配置可用的 SUDOCODE_TEXT_MODEL
+# 如需生成热榜新灵感或组合风格提示词，再配置可用的 SUDOCODE_TEXT_MODEL
+# 如需从参考图提取风格，再配置支持看图的 SUDOCODE_VISION_MODEL
 # 如需启用提示词库和系列管理，再填写 MYSQL_* 配置
 npm install
 npm run dev
@@ -52,6 +53,8 @@ npm run dev
 - 提示词管理：顶部“提示词库”入口支持搜索、保存当前提示词、点击填入和删除
 - 今日提示词热榜：内置 17 条复杂中文提示词，每日稳定随机展示 6 条；点击刷新图标可即时切换本地内容，点击条目即可填入
 - 热榜新灵感：在配置文本模型后可点击“生成新灵感”，服务端会生成、校验并缓存 6 条复杂中文提示词；新生成内容会立即显示在列表顶部，提示词只包含画面内容，不包含画幅比例；缓存位于桌面 `Image-Assisant\prompt-cache.json`，最多保留 120 条
+- 图片反推提示词：上传一张参考图后，由视觉模型提取原图内容、构图、镜头、光影、色彩、材质、风格和负面提示；输入新的画面内容后可预览、编辑完整提示词，再手动应用到现有生图流程。参考图只会上送到配置的模型提供方进行本次分析，不写入本地磁盘、数据库或浏览器存储
+- 本地风格模板：可复用构图、镜头、光影、色彩、材质、风格和负面提示，不保存参考图及原图主体内容；未连接 MySQL 时仍可在当前浏览器正常使用
 - 会话内历史记录、查看、下载与大图预览；主图和缩略图均按原比例展示
 - 浅色、深色主题切换，主题偏好保存在本机浏览器中
 
@@ -65,13 +68,19 @@ npm run dev
 SUDOCODE_BASE_URL=https://api.sudorelay.com/v1
 ```
 
-文本模型为可选能力，且仅供“生成新灵感”使用。填写的模型必须与所选上游兼容 `/chat/completions`：
+文本模型为可选能力，供“生成新灵感”、故事分镜和风格提示词组合使用。填写的模型必须与所选上游兼容 `/chat/completions`：
 
 ```ini
 SUDOCODE_TEXT_MODEL=gpt-4.1-mini
 ```
 
-未设置 `SUDOCODE_TEXT_MODEL` 时，图片生成、桌面保存和热榜本地刷新仍可正常使用；“生成新灵感”会返回明确的配置提示。
+支持图片输入的视觉模型用于“从图片提取风格”：
+
+```ini
+SUDOCODE_VISION_MODEL=gpt-4.1-mini
+```
+
+未设置 `SUDOCODE_TEXT_MODEL` 时，风格提示词组合会回退到 `SUDOCODE_VISION_MODEL`。未设置视觉模型时，图片生成、编辑、桌面保存和其他现有功能仍可正常使用；风格提取入口会返回明确的配置提示。
 
 界面采用紧凑的开源工具型 UI 设计取向，参考 [shadcn/ui](https://github.com/shadcn-ui/ui) 的组件风格，并使用 Lucide 图标。
 
