@@ -125,6 +125,41 @@ async function migrateDatabase(connection) {
       CONSTRAINT fk_images_node FOREIGN KEY (node_id) REFERENCES series_nodes(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS image_version_groups (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      series_id BIGINT UNSIGNED NULL,
+      node_id BIGINT UNSIGNED NULL,
+      title VARCHAR(160) NULL,
+      current_delivery_version_id BIGINT UNSIGNED NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_version_groups_series_node (series_id, node_id),
+      INDEX idx_version_groups_updated (updated_at),
+      CONSTRAINT fk_version_groups_series FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE SET NULL,
+      CONSTRAINT fk_version_groups_node FOREIGN KEY (node_id) REFERENCES series_nodes(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS image_versions (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      group_id BIGINT UNSIGNED NOT NULL,
+      parent_version_id BIGINT UNSIGNED NULL,
+      image_record_id BIGINT UNSIGNED NOT NULL,
+      version_number INT UNSIGNED NOT NULL,
+      prompt_snapshot TEXT NOT NULL,
+      operation ENUM('generate','edit') NOT NULL,
+      is_delivery TINYINT(1) NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_image_version_number (group_id, version_number),
+      INDEX idx_image_versions_group (group_id, created_at),
+      CONSTRAINT fk_image_versions_group FOREIGN KEY (group_id) REFERENCES image_version_groups(id) ON DELETE CASCADE,
+      CONSTRAINT fk_image_versions_parent FOREIGN KEY (parent_version_id) REFERENCES image_versions(id) ON DELETE SET NULL,
+      CONSTRAINT fk_image_versions_record FOREIGN KEY (image_record_id) REFERENCES image_records(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
 }
 
 function toPrompt(row) {
@@ -220,12 +255,97 @@ export async function saveGeneratedImage(record) {
   return Number(result.insertId);
 }
 
+export async function saveImageVersion(input) {
+  const database = await getDatabase();
+  if (!database || !Number.isInteger(Number(input.imageRecordId))) return null;
+  const connection = await database.getConnection();
+  try {
+    await connection.beginTransaction();
+    let groupId = Number.isInteger(Number(input.versionGroupId)) ? Number(input.versionGroupId) : null;
+    let parentVersionId = Number.isInteger(Number(input.parentVersionId)) ? Number(input.parentVersionId) : null;
+    let versionNumber = 1;
+
+    if (groupId) {
+      const [groups] = await connection.query("SELECT id FROM image_version_groups WHERE id=? FOR UPDATE", [groupId]);
+      if (!groups[0]) groupId = null;
+    }
+    if (!groupId) {
+      const [groupResult] = await connection.query(
+        "INSERT INTO image_version_groups (series_id, node_id, title) VALUES (?, ?, ?)",
+        [input.seriesId || null, input.nodeId || null, input.title || null]
+      );
+      groupId = Number(groupResult.insertId);
+
+      const sourceImageRecordId = Number.isInteger(Number(input.sourceImageRecordId)) ? Number(input.sourceImageRecordId) : null;
+      if (sourceImageRecordId && sourceImageRecordId !== Number(input.imageRecordId)) {
+        const [sourceRows] = await connection.query(
+          "SELECT id, prompt_snapshot, operation FROM image_records WHERE id=?",
+          [sourceImageRecordId]
+        );
+        if (sourceRows[0]) {
+          const [sourceVersionResult] = await connection.query(
+            "INSERT INTO image_versions (group_id, image_record_id, version_number, prompt_snapshot, operation) VALUES (?, ?, 1, ?, ?)",
+            [groupId, sourceRows[0].id, sourceRows[0].prompt_snapshot, sourceRows[0].operation]
+          );
+          parentVersionId = sourceVersionResult.insertId;
+          versionNumber = 2;
+        }
+      }
+    } else {
+      const [maxRows] = await connection.query(
+        "SELECT COALESCE(MAX(version_number), 0) AS max_version FROM image_versions WHERE group_id=?",
+        [groupId]
+      );
+      versionNumber = Number(maxRows[0]?.max_version || 0) + 1;
+    }
+
+    if (parentVersionId) {
+      const [parents] = await connection.query("SELECT id FROM image_versions WHERE id=? AND group_id=?", [parentVersionId, groupId]);
+      if (!parents[0]) parentVersionId = null;
+    }
+    const [versionResult] = await connection.query(
+      "INSERT INTO image_versions (group_id, parent_version_id, image_record_id, version_number, prompt_snapshot, operation) VALUES (?, ?, ?, ?, ?, ?)",
+      [groupId, parentVersionId, input.imageRecordId, versionNumber, input.prompt || "", input.operation === "edit" ? "edit" : "generate"]
+    );
+    await connection.query("UPDATE image_version_groups SET updated_at=CURRENT_TIMESTAMP WHERE id=?", [groupId]);
+    await connection.commit();
+    return { versionId: Number(versionResult.insertId), versionGroupId: groupId, parentVersionId, versionNumber, isDelivery: false };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+export async function markImageVersionDelivered(versionId) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法设置交付版本。");
+  const connection = await database.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [versions] = await connection.query("SELECT id, group_id FROM image_versions WHERE id=? FOR UPDATE", [Number(versionId)]);
+    if (!versions[0]) throw new Error("版本不存在。");
+    const groupId = Number(versions[0].group_id);
+    await connection.query("UPDATE image_versions SET is_delivery=0 WHERE group_id=?", [groupId]);
+    await connection.query("UPDATE image_versions SET is_delivery=1 WHERE id=?", [Number(versionId)]);
+    await connection.query("UPDATE image_version_groups SET current_delivery_version_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", [Number(versionId), groupId]);
+    await connection.commit();
+    return { versionId: Number(versionId), versionGroupId: groupId, isDelivery: true };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 export async function listGeneratedImages(limit = 60) {
   const database = await getDatabase();
   if (!database) return [];
   const safeLimit = Math.max(1, Math.min(Number(limit) || 60, 200));
   const [rows] = await database.query(
-    "SELECT i.id, i.title, i.file_name, i.relative_path, i.public_url, i.prompt_snapshot, i.operation, i.created_at, i.series_id, s.name AS series_name, i.node_id, n.title AS node_title, n.node_order FROM image_records i LEFT JOIN series s ON s.id = i.series_id LEFT JOIN series_nodes n ON n.id = i.node_id WHERE i.status='completed' ORDER BY i.created_at DESC, i.id DESC LIMIT " + safeLimit
+    "SELECT i.id, i.title, i.file_name, i.relative_path, i.public_url, i.prompt_snapshot, i.operation, i.created_at, i.series_id, s.name AS series_name, i.node_id, n.title AS node_title, n.node_order, v.id AS version_id, v.group_id AS version_group_id, v.version_number, v.parent_version_id, v.is_delivery FROM image_records i LEFT JOIN series s ON s.id = i.series_id LEFT JOIN series_nodes n ON n.id = i.node_id LEFT JOIN image_versions v ON v.image_record_id = i.id LEFT JOIN image_version_groups g ON g.id = v.group_id WHERE i.status='completed' ORDER BY i.created_at DESC, i.id DESC LIMIT " + safeLimit
   );
   return rows.map((row) => ({
     id: row.id,
@@ -240,6 +360,11 @@ export async function listGeneratedImages(limit = 60) {
     nodeId: row.node_id,
     nodeTitle: row.node_title,
     nodeOrder: row.node_order,
+    versionId: row.version_id,
+    versionGroupId: row.version_group_id,
+    versionNumber: row.version_number,
+    parentVersionId: row.parent_version_id,
+    isDelivery: Boolean(row.is_delivery),
     createdAt: row.created_at
   }));
 }

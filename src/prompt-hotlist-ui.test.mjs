@@ -99,3 +99,19 @@ test("shows each gallery image prompt and supports collapsing nodes", async () =
   assert.match(styles, /\.gallery-node-toggle/);
   assert.match(styles, /\.history-prompt/);
 });
+
+test("connects history images to editing and delivery-version actions", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /from "\.\/image-version-session\.mjs"/);
+  assert.match(source, /continueEditing\(item\)/);
+  assert.match(source, /setDeliveryVersion\(item\)/);
+  assert.match(source, new RegExp("/api/library/images/versions/"));
+  assert.match(source, /versionNumber/);
+  assert.match(source, /isDelivery/);
+  assert.match(source, /继续编辑/);
+  assert.match(source, /设为交付版本/);
+  assert.match(styles, /\.history-edit-button/);
+  assert.match(styles, /\.delivery-badge/);
+});

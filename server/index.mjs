@@ -26,7 +26,9 @@ import {
   listGeneratedImages,
   listSeries,
   listSeriesNodes,
+  markImageVersionDelivered,
   saveGeneratedImage,
+  saveImageVersion,
   updateSeriesNodeStatus,
   upsertPrompt
 } from "./database.mjs";
@@ -151,6 +153,7 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
     nodeOrder: metadata.nodeOrder
   });
   let databaseId = null;
+  let versionInfo = null;
   try {
     databaseId = await saveGeneratedImage({
       title: metadata.title,
@@ -166,6 +169,17 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
       model: "gpt-image-2",
       providerRequestId: response.headers.get("x-request-id") || response.headers.get("request-id")
     });
+    versionInfo = await saveImageVersion({
+      imageRecordId: databaseId,
+      sourceImageRecordId: metadata.sourceImageRecordId,
+      versionGroupId: metadata.versionGroupId,
+      parentVersionId: metadata.parentVersionId,
+      seriesId: metadata.seriesId,
+      nodeId: metadata.nodeId,
+      title: metadata.title,
+      prompt: metadata.prompt || item.revised_prompt || "",
+      operation
+    });
     await updateNodeStatus(metadata.nodeId, "completed", requestId);
   } catch (error) {
     log("database_save_failed", { requestId, operation, ...errorDetails(error) });
@@ -175,6 +189,11 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
     fileName: savedImage.fileName,
     relativePath: savedImage.relativePath,
     databaseId,
+    versionId: versionInfo?.versionId || null,
+    versionGroupId: versionInfo?.versionGroupId || null,
+    parentVersionId: versionInfo?.parentVersionId || null,
+    versionNumber: versionInfo?.versionNumber || null,
+    isDelivery: Boolean(versionInfo?.isDelivery),
     revisedPrompt: item.revised_prompt || null
   };
 }
@@ -213,6 +232,19 @@ app.get("/api/library/images", async (req, res) => {
     res.json({ images, databaseConfigured: isDatabaseConfigured() });
   } catch (error) {
     sendError(req, res, 503, error instanceof Error ? error.message : "读取图片合集失败。", { operation: "image_library", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/library/images/versions/:id/deliver", async (req, res) => {
+  const versionId = Number(req.params.id);
+  if (!Number.isInteger(versionId) || versionId <= 0) {
+    sendError(req, res, 400, "无效的图片版本 ID。", { operation: "version_delivery" });
+    return;
+  }
+  try {
+    res.json(await markImageVersionDelivered(versionId));
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "设置交付版本失败。", { operation: "version_delivery", ...errorDetails(error) });
   }
 });
 
@@ -452,7 +484,10 @@ app.post("/api/images/generate", async (req, res) => {
       seriesName: typeof req.body?.seriesName === "string" ? req.body.seriesName : undefined,
       seriesId: Number.isInteger(Number(req.body?.seriesId)) ? Number(req.body.seriesId) : null,
       nodeId: Number.isInteger(Number(req.body?.nodeId)) ? Number(req.body.nodeId) : null,
-      nodeOrder: Number.isInteger(Number(req.body?.nodeOrder)) ? Number(req.body.nodeOrder) : undefined
+      nodeOrder: Number.isInteger(Number(req.body?.nodeOrder)) ? Number(req.body.nodeOrder) : undefined,
+      versionGroupId: Number.isInteger(Number(req.body?.versionGroupId)) ? Number(req.body.versionGroupId) : null,
+      parentVersionId: Number.isInteger(Number(req.body?.parentVersionId)) ? Number(req.body.parentVersionId) : null,
+      sourceImageRecordId: Number.isInteger(Number(req.body?.sourceImageRecordId)) ? Number(req.body.sourceImageRecordId) : null
     }));
   } catch (error) {
     await updateNodeStatus(req.body?.nodeId, "failed", req.requestId);
@@ -526,7 +561,10 @@ app.post(
         seriesName: typeof req.body?.seriesName === "string" ? req.body.seriesName : undefined,
         seriesId: Number.isInteger(Number(req.body?.seriesId)) ? Number(req.body.seriesId) : null,
         nodeId: Number.isInteger(Number(req.body?.nodeId)) ? Number(req.body.nodeId) : null,
-        nodeOrder: Number.isInteger(Number(req.body?.nodeOrder)) ? Number(req.body.nodeOrder) : undefined
+        nodeOrder: Number.isInteger(Number(req.body?.nodeOrder)) ? Number(req.body.nodeOrder) : undefined,
+        versionGroupId: Number.isInteger(Number(req.body?.versionGroupId)) ? Number(req.body.versionGroupId) : null,
+        parentVersionId: Number.isInteger(Number(req.body?.parentVersionId)) ? Number(req.body.parentVersionId) : null,
+        sourceImageRecordId: Number.isInteger(Number(req.body?.sourceImageRecordId)) ? Number(req.body.sourceImageRecordId) : null
       }));
     } catch (error) {
       await updateNodeStatus(req.body?.nodeId, "failed", req.requestId);

@@ -73,3 +73,18 @@ footer { display: flex; justify-content: space-between; padding: 16px 0 23px; co
 @media (max-width: 600px) { .manager-backdrop { padding: 12px; }.manager-dialog { max-height: calc(100vh - 24px); }.series-layout { grid-template-columns: 1fr; } }
 
 .hotlist-heading { gap: 8px; }.hotlist-refresh:focus-visible, .hotlist-generate:focus-visible { outline: 2px solid #2d67f4; outline-offset: 1px; }.hotlist-generate { display: inline-flex; min-height: 24px; align-items: center; gap: 4px; padding: 0 7px; border: 1px solid #c8d7fb; border-radius: 5px; color: #2454bd; background: #edf3ff; font-size: 10px; font-weight: 800; white-space: nowrap; }.hotlist-generate:hover:not(:disabled) { border-color: #8dadf8; background: #dfeaff; }.hotlist-generate:disabled { color: #6f89c6; cursor: wait; }:root[data-theme="dark"] .hotlist-refresh { border-color: #3a414e; color: #d7deea; background: #1d222b; }:root[data-theme="dark"] .hotlist-generate { border-color: #4a6299; color: #d5e1ff; background: #263452; }
+
+.version-meta { display: flex; align-items: center; justify-content: space-between; min-height: 23px; padding: 0 7px; color: #667085; font-size: 10px; }
+.version-label { color: #356bd9; font: 700 10px "DM Mono", monospace; }
+.delivery-badge { display: inline-flex; align-items: center; gap: 3px; color: #188653; font-weight: 750; }
+.history-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 7px 9px; }
+.history-edit-button { display: inline-flex; align-items: center; }
+.history-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 27px; padding: 0 7px; border: 1px solid #d8dee6; border-radius: 5px; color: #475467; background: #fff; font-size: 10px; font-weight: 700; }
+.history-actions button:hover { border-color: #9db7f5; color: #2454bd; background: #f5f8ff; }
+.history-actions .history-delivery-button { border-color: #b7dec8; color: #188653; background: #f2fbf5; }
+.history-actions .history-delivery-button:hover { border-color: #70bd91; background: #e8f8ee; }
+:root[data-theme="dark"] .version-label { color: #9dbbff; }
+:root[data-theme="dark"] .delivery-badge { color: #8fddb0; }
+:root[data-theme="dark"] .history-actions button { border-color: #3a414e; color: #d7deea; background: #202630; }
+:root[data-theme="dark"] .history-actions button:hover { border-color: #5c85ea; color: #d5e1ff; background: #263452; }
+:root[data-theme="dark"] .history-actions .history-delivery-button { border-color: #2a6a4c; color: #9de0b9; background: #172d24; }

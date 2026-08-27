@@ -24,6 +24,7 @@ import {
 import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 import type { PromptHotlistItem } from "./prompt-hotlist.mjs";
 import { groupHistoryRecords } from "./gallery-groups.mjs";
+import { enrichSessionVersion, markSessionDelivery } from "./image-version-session.mjs";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -35,6 +36,7 @@ type ReferenceImage = {
 type Result = {
   id: string;
   src: string;
+  imageRecordId?: number | null;
   fileName?: string;
   seriesId?: number | null;
   seriesName?: string | null;
@@ -44,6 +46,11 @@ type Result = {
   prompt: string;
   kind: Mode;
   createdAt: Date;
+  versionId?: number | string | null;
+  versionGroupId?: number | string | null;
+  versionNumber?: number | null;
+  parentVersionId?: number | string | null;
+  isDelivery?: boolean;
 };
 type LibraryPrompt = {
   id: number;
@@ -109,6 +116,7 @@ function App() {
   const [maskPreview, setMaskPreview] = useState("");
   const [current, setCurrent] = useState<Result | null>(null);
   const [history, setHistory] = useState<Result[]>([]);
+  const [versionParent, setVersionParent] = useState<Result | null>(null);
   const [collapsedGalleryNodes, setCollapsedGalleryNodes] = useState<Set<string>>(() => new Set());
   const [historyLoading, setHistoryLoading] = useState(true);
   const [preview, setPreview] = useState<Result | null>(null);
@@ -169,9 +177,10 @@ function App() {
       .then(async (response) => response.ok ? response.json() : { images: [] })
       .then((data) => {
         if (!Array.isArray(data.images)) return;
-        const savedResults: Result[] = data.images.map((item: { id: number; image: string; fileName?: string; prompt?: string; kind?: string; seriesId?: number | null; seriesName?: string | null; nodeId?: number | null; nodeTitle?: string | null; nodeOrder?: number | null; createdAt?: string }) => ({
+        const savedResults: Result[] = data.images.map((item: { id: number; image: string; fileName?: string; prompt?: string; kind?: string; seriesId?: number | null; seriesName?: string | null; nodeId?: number | null; nodeTitle?: string | null; nodeOrder?: number | null; createdAt?: string; versionId?: number | null; versionGroupId?: number | null; versionNumber?: number | null; parentVersionId?: number | null; isDelivery?: boolean }) => ({
           id: "db-" + item.id,
           src: item.image,
+          imageRecordId: item.id,
           fileName: item.fileName,
           seriesId: item.seriesId,
           seriesName: item.seriesName,
@@ -180,7 +189,12 @@ function App() {
           nodeOrder: item.nodeOrder,
           prompt: item.prompt || item.fileName || "已保存图片",
           kind: item.kind === "edit" ? "edit" : "generate",
-          createdAt: new Date(item.createdAt || Date.now())
+          createdAt: new Date(item.createdAt || Date.now()),
+          versionId: item.versionId,
+          versionGroupId: item.versionGroupId,
+          versionNumber: item.versionNumber,
+          parentVersionId: item.parentVersionId,
+          isDelivery: Boolean(item.isDelivery)
         }));
         setHistory((items) => {
           const merged = [...items, ...savedResults];
@@ -464,6 +478,7 @@ function App() {
     const failures: string[] = [];
     const warnings: string[] = [];
     let previousImage: { blob: Blob; fileName: string } | null = null;
+    let previousVersion: Result | null = null;
     try {
       for (let index = 0; index < seriesNodes.length; index += 1) {
         const node = seriesNodes[index];
@@ -482,6 +497,9 @@ function App() {
             form.append("seriesId", String(activeSeries.id));
             form.append("nodeId", String(node.id));
             form.append("nodeOrder", String(node.node_order));
+            if (previousVersion?.versionGroupId) form.append("versionGroupId", String(previousVersion.versionGroupId));
+            if (previousVersion?.versionId) form.append("parentVersionId", String(previousVersion.versionId));
+            if (previousVersion?.imageRecordId) form.append("sourceImageRecordId", String(previousVersion.imageRecordId));
             form.append("image[]", previousImage.blob, previousImage.fileName);
             response = await fetch("/api/images/edit", { method: "POST", body: form });
           } else {
@@ -501,9 +519,10 @@ function App() {
           }
           if (!response.ok) throw new Error(await readApiError(response));
           const data = await response.json();
-          generated.push({
+          const generatedResult: Result = {
             id: data.databaseId ? "db-" + data.databaseId : crypto.randomUUID(),
             src: data.image,
+            imageRecordId: data.databaseId || null,
             fileName: data.fileName,
             seriesId: activeSeries.id,
             seriesName: activeSeries.name,
@@ -512,8 +531,16 @@ function App() {
             nodeOrder: node.node_order,
             prompt: data.revisedPrompt || nodePrompt,
             kind: operation,
-            createdAt: new Date()
-          });
+            createdAt: new Date(),
+            versionId: data.versionId || null,
+            versionGroupId: data.versionGroupId || null,
+            versionNumber: data.versionNumber || null,
+            parentVersionId: data.parentVersionId || null,
+            isDelivery: Boolean(data.isDelivery)
+          };
+          const versionedResult: Result = data.versionId ? generatedResult : enrichSessionVersion(generatedResult, operation === "edit" ? previousVersion : null);
+          generated.push(versionedResult);
+          previousVersion = versionedResult;
           const imageResponse = await fetch(data.image);
           if (imageResponse.ok) {
             previousImage = { blob: await imageResponse.blob(), fileName: data.fileName || ("node-" + node.node_order + ".png") };
@@ -617,6 +644,56 @@ function App() {
     setPreview(result);
   }
 
+  async function continueEditing(result: Result) {
+    setError("");
+    setActivityStatus("正在准备历史图片编辑...");
+    setActivityTone("working");
+    try {
+      const response = await fetch(result.src);
+      if (!response.ok) throw new Error("无法读取这张历史图片。");
+      const blob = await response.blob();
+      const file = new File([blob], result.fileName || "history-image.png", { type: blob.type || "image/png" });
+      referenceImages.forEach((image) => releasePreview(image.preview));
+      const preview = createPreview(file);
+      setReferenceImages([{ file, preview }]);
+      setVersionParent(result);
+      setPrompt(result.prompt);
+      setMode("edit");
+      setCurrent(result);
+      setActivityStatus("已载入历史图片，可继续编辑并生成新版本。");
+      setActivityTone("idle");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "载入历史图片失败。";
+      setError(message);
+      setActivityStatus(message);
+      setActivityTone("error");
+    }
+  }
+
+  async function setDeliveryVersion(result: Result) {
+    if (!result.versionId) {
+      setError("这张图片暂时没有可确认的版本信息。");
+      return;
+    }
+    try {
+      if (typeof result.versionId === "number") {
+        const response = await fetch("/api/library/images/versions/" + result.versionId + "/deliver", { method: "POST" });
+        if (!response.ok) throw new Error(await readApiError(response));
+      }
+      setHistory((items) => markSessionDelivery(items, result.versionId!));
+      setCurrent((item) => item && String(item.versionGroupId) === String(result.versionGroupId) ? { ...item, isDelivery: item.versionId === result.versionId } : item);
+      setPreview((item) => item && String(item.versionGroupId) === String(result.versionGroupId) ? { ...item, isDelivery: item.versionId === result.versionId } : item);
+      setActivityStatus("已将该版本设为当前交付版本。");
+      setActivityTone("success");
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "设置交付版本失败。";
+      setError(message);
+      setActivityStatus(message);
+      setActivityTone("error");
+    }
+  }
+
   function toggleGalleryNode(key: string) {
     setCollapsedGalleryNodes((collapsed) => {
       const next = new Set(collapsed);
@@ -690,11 +767,14 @@ function App() {
           body: JSON.stringify({
             prompt,
             size,
-            title: activeNode?.title || undefined,
-            seriesName: activeSeries?.name || undefined,
-            seriesId: activeSeries?.id || undefined,
-            nodeId: activeNode?.id || undefined,
-            nodeOrder: activeNode?.node_order || undefined
+            title: versionParent?.nodeTitle || activeNode?.title || undefined,
+            seriesName: versionParent?.seriesName || activeSeries?.name || undefined,
+            seriesId: versionParent?.seriesId ?? activeSeries?.id ?? undefined,
+            nodeId: versionParent?.nodeId ?? activeNode?.id ?? undefined,
+            nodeOrder: versionParent?.nodeOrder ?? activeNode?.node_order ?? undefined,
+            versionGroupId: versionParent?.versionGroupId || undefined,
+            parentVersionId: versionParent?.versionId || undefined,
+            sourceImageRecordId: versionParent?.imageRecordId || undefined
           })
         });
         setExecutionStage("processing");
@@ -704,11 +784,14 @@ function App() {
         const form = new FormData();
         form.append("prompt", prompt);
         form.append("size", size);
-        if (activeNode?.title) form.append("title", activeNode.title);
-        if (activeSeries?.name) form.append("seriesName", activeSeries.name);
-        if (activeSeries?.id) form.append("seriesId", String(activeSeries.id));
-        if (activeNode?.id) form.append("nodeId", String(activeNode.id));
-        if (activeNode?.node_order) form.append("nodeOrder", String(activeNode.node_order));
+        if (versionParent?.nodeTitle || activeNode?.title) form.append("title", versionParent?.nodeTitle || activeNode?.title || "");
+        if (versionParent?.seriesName || activeSeries?.name) form.append("seriesName", versionParent?.seriesName || activeSeries?.name || "");
+        if (versionParent?.seriesId ?? activeSeries?.id) form.append("seriesId", String(versionParent?.seriesId ?? activeSeries?.id));
+        if (versionParent?.nodeId ?? activeNode?.id) form.append("nodeId", String(versionParent?.nodeId ?? activeNode?.id));
+        if (versionParent?.nodeOrder ?? activeNode?.node_order) form.append("nodeOrder", String(versionParent?.nodeOrder ?? activeNode?.node_order));
+        if (versionParent?.versionGroupId) form.append("versionGroupId", String(versionParent.versionGroupId));
+        if (versionParent?.versionId) form.append("parentVersionId", String(versionParent.versionId));
+        if (versionParent?.imageRecordId) form.append("sourceImageRecordId", String(versionParent.imageRecordId));
         referenceImages.forEach((image) => form.append("image[]", image.file));
         if (maskFile) form.append("mask", maskFile);
         const request = fetch("/api/images/edit", { method: "POST", body: form });
@@ -722,18 +805,26 @@ function App() {
       const result: Result = {
         id: data.databaseId ? "db-" + data.databaseId : crypto.randomUUID(),
         src: data.image,
+        imageRecordId: data.databaseId || null,
         fileName: data.fileName,
-        seriesId: activeSeries?.id,
-        seriesName: activeSeries?.name,
-        nodeId: activeNode?.id,
-        nodeTitle: activeNode?.title,
-        nodeOrder: activeNode?.node_order,
+        seriesId: versionParent?.seriesId ?? activeSeries?.id,
+        seriesName: versionParent?.seriesName ?? activeSeries?.name,
+        nodeId: versionParent?.nodeId ?? activeNode?.id,
+        nodeTitle: versionParent?.nodeTitle ?? activeNode?.title,
+        nodeOrder: versionParent?.nodeOrder ?? activeNode?.node_order,
         prompt: data.revisedPrompt || prompt,
         kind: operation,
-        createdAt: new Date()
+        createdAt: new Date(),
+        versionId: data.versionId || null,
+        versionGroupId: data.versionGroupId || null,
+        versionNumber: data.versionNumber || null,
+        parentVersionId: data.parentVersionId || null,
+        isDelivery: Boolean(data.isDelivery)
       };
-      setCurrent(result);
-      setHistory((items) => [result, ...items].slice(0, 60));
+      const versionedResult = data.versionId ? result : enrichSessionVersion(result, operation === "edit" ? versionParent : null);
+      setCurrent(versionedResult);
+      setHistory((items) => [versionedResult, ...items].slice(0, 60));
+      setVersionParent(null);
       setApiReady(true);
       setExecutionStage("completed");
       setActivityStatus("生成成功，图片已保存到桌面文件夹。");
@@ -757,7 +848,23 @@ function App() {
             : <img key={item.id + "-" + (imageRetries[item.src] || 0)} src={getImageSource(item.src)} data-image-source={item.src} alt={item.prompt} onError={handleImageError} />}
         </button>
         <div className="history-item-meta"><span><Clock3 size={13} /> {formatTime(item.createdAt)}</span><DownloadButton src={item.src} filename={item.fileName || "image-assistant.png"} /></div>
+        {(item.versionNumber || item.isDelivery) && (
+          <div className="version-meta">
+            <span className="version-label">V{item.versionNumber || 1}</span>
+            {item.isDelivery && <span className="delivery-badge"><CheckCircle2 size={12} /> 当前交付</span>}
+          </div>
+        )}
         <p className="history-prompt" title={item.prompt}>{item.prompt}</p>
+        <div className="history-actions">
+          <button className="history-edit-button" type="button" onClick={() => void continueEditing(item)}>
+            <Eraser size={13} /> 继续编辑
+          </button>
+          {item.versionId && !item.isDelivery && (
+            <button className="history-delivery-button" type="button" onClick={() => void setDeliveryVersion(item)}>
+              <CheckCircle2 size={13} /> 设为交付版本
+            </button>
+          )}
+        </div>
       </article>
     );
   }
