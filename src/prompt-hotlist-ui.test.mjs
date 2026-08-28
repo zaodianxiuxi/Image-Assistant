@@ -188,3 +188,14 @@ test("makes the style extraction workbench readable and less dense", async () =>
   assert.match(styles, /\.style-analysis-field textarea, \.style-compose-field textarea \{[^}]*font-size: 13px/);
   assert.match(styles, /\.style-inline-actions button, \.style-save-profile, \.style-compose-button, \.style-apply-button, \.style-series-placeholder button \{[^}]*font-size: 12px/);
 });
+
+test("presents the style extraction workbench as a larger right-side drawer", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.style-workbench-backdrop \{[^}]*place-items: stretch end/);
+  assert.match(styles, /\.style-workbench \{[^}]*width: min\(820px, 94vw\)/);
+  assert.match(styles, /\.style-workbench \{[^}]*height: 100%/);
+  assert.match(styles, /\.style-workbench \{[^}]*border-radius: 14px 0 0 14px/);
+  assert.match(styles, /@keyframes style-drawer-in/);
+  assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.style-workbench \{[^}]*width: 100%[^}]*border-radius: 0/);
+});
