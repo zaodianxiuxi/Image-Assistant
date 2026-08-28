@@ -189,6 +189,18 @@ body { font-size: 14px; line-height: 1.55; }
 .history-actions { gap: 7px; padding: 0 8px 10px; }
 .history-actions button { min-height: 30px; padding: 0 8px; font-size: 11px; }
 
+/* The extension rail keeps secondary tools visible without competing with the prompt form. */
+.app-shell { padding: 0 clamp(14px, 1.8vw, 28px); }
+.workspace { grid-template-columns: 360px minmax(0, 1fr) 50px; gap: clamp(8px, 1vw, 14px); }
+.extension-rail { display: flex; flex-direction: column; align-items: center; align-self: start; gap: 8px; min-width: 0; height: 100%; padding-top: 28px; }
+.extension-tool { position: relative; display: grid; width: 44px; height: 44px; place-items: center; padding: 0; border: 1px solid var(--border-subtle); border-radius: 9px; color: var(--text-muted); background: var(--surface-panel); box-shadow: 0 2px 7px color-mix(in srgb, var(--text-strong), transparent 92%); transition: transform .16s ease, border-color .16s ease, color .16s ease, background-color .16s ease; }
+.extension-tool:hover:not(:disabled), .extension-tool:focus-visible { border-color: color-mix(in srgb, var(--accent), var(--border-subtle) 35%); color: var(--accent); background: var(--accent-soft); outline: none; transform: scale(1.06); }
+.extension-tool.active { border-color: color-mix(in srgb, var(--accent), var(--border-subtle) 45%); color: var(--accent); background: var(--accent-soft); }
+.extension-tool.planned { opacity: .56; cursor: not-allowed; }
+.extension-tool-label { position: absolute; right: calc(100% + 8px); top: 50%; z-index: 4; width: max-content; max-width: 180px; padding: 6px 8px; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-strong); background: var(--surface-panel); box-shadow: 0 8px 22px color-mix(in srgb, var(--text-strong), transparent 84%); font-size: 12px; font-weight: 700; line-height: 1.2; opacity: 0; pointer-events: none; transform: translate(4px, -50%); transition: opacity .14s ease, transform .14s ease; }
+.extension-tool:hover::after, .extension-tool:focus-visible::after { position: absolute; right: calc(100% + 8px); top: 50%; z-index: 3; width: max-content; max-width: 180px; padding: 6px 8px; content: attr(data-label); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-strong); background: var(--surface-panel); box-shadow: 0 8px 22px color-mix(in srgb, var(--text-strong), transparent 84%); font-size: 12px; font-weight: 700; line-height: 1.2; opacity: 1; pointer-events: none; transform: translate(0, -50%); }
+.extension-tool-label { display: none; }
+
 /* Thin, visible scrollbars make the independent desktop panels discoverable without adding visual weight. */
 .control-panel,
 .workspace > .canvas-panel,
@@ -225,6 +237,17 @@ body { font-size: 14px; line-height: 1.55; }
 .image-preview-dialog > p::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
   background-clip: padding-box;
+}
+
+@media (max-width: 850px) {
+  .workspace { grid-template-columns: 1fr; }
+  .extension-rail { display: grid; grid-template-columns: repeat(4, 44px); justify-content: space-between; align-items: center; gap: 8px; height: auto; padding-top: 0; }
+  .extension-tool { width: 44px; height: 44px; }
+}
+
+@media (max-width: 500px) {
+  .extension-rail { grid-template-columns: repeat(4, 42px); gap: 6px; }
+  .extension-tool { width: 42px; height: 42px; }
 }
 
 /* Lift the smallest labels and helper copy one step for comfortable Chinese reading. */
@@ -382,4 +405,24 @@ body { font-size: 14px; line-height: 1.55; }
   .style-workbench-backdrop { place-items: stretch; padding: 0; }
   .style-workbench { width: 100%; height: 100%; max-height: 100dvh; border-radius: 0; }
   .style-workbench-body { grid-template-columns: 1fr; }
+}
+
+/* Prompt library and series manager share a top drawer instead of a centered modal. */
+.manager-backdrop { left: calc(clamp(14px, 1.8vw, 28px) + 360px + clamp(8px, 1vw, 14px)); right: 0; place-items: start center; padding: 0; background: color-mix(in srgb, var(--text-strong), transparent 38%); }
+.manager-dialog { width: 100%; height: 50dvh; max-height: 50dvh; border-radius: 0 0 12px 12px; animation: manager-drawer-in .32s ease-out; will-change: transform; }
+.manager-backdrop.closing .manager-dialog { animation: manager-drawer-out .28s ease-in forwards; }
+
+@keyframes manager-drawer-in {
+  from { opacity: .72; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes manager-drawer-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-100%); }
+}
+
+@media (max-width: 600px) {
+  .manager-backdrop { left: 0; place-items: start center; padding: 0; }
+  .manager-dialog { width: 100%; height: 50dvh; max-height: 50dvh; border-radius: 0 0 10px 10px; }
 }

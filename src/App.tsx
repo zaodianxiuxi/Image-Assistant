@@ -31,6 +31,7 @@ import StyleWorkbench from "./StyleWorkbench";
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
 type Theme = "light" | "dark" | "studio";
+type ManagerPanel = "library" | "series";
 type ReferenceImage = {
   file: File;
   preview: string;
@@ -143,6 +144,7 @@ function App() {
   const [promptIdeasLoading, setPromptIdeasLoading] = useState(false);
   const [promptIdeasStatus, setPromptIdeasStatus] = useState("");
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [managerClosing, setManagerClosing] = useState<ManagerPanel | null>(null);
   const [libraryPrompts, setLibraryPrompts] = useState<LibraryPrompt[]>([]);
   const [librarySearch, setLibrarySearch] = useState("");
   const [libraryStatus, setLibraryStatus] = useState("");
@@ -165,6 +167,39 @@ function App() {
   const maskInput = useRef<HTMLInputElement>(null);
   const inputLogged = useRef(false);
   const previewUrls = useRef(new Set<string>());
+  const managerCloseTimer = useRef<number | null>(null);
+
+  function clearManagerCloseTimer() {
+    if (managerCloseTimer.current !== null) {
+      window.clearTimeout(managerCloseTimer.current);
+      managerCloseTimer.current = null;
+    }
+  }
+
+  function openManager(panel: ManagerPanel) {
+    clearManagerCloseTimer();
+    setManagerClosing(null);
+    if (panel === "library") {
+      setSeriesOpen(false);
+      setLibraryOpen(true);
+      void loadLibraryPrompts();
+    } else {
+      setLibraryOpen(false);
+      setSeriesOpen(true);
+      void loadSeries();
+    }
+  }
+
+  function closeManager(panel: ManagerPanel) {
+    clearManagerCloseTimer();
+    setManagerClosing(panel);
+    managerCloseTimer.current = window.setTimeout(() => {
+      if (panel === "library") setLibraryOpen(false);
+      else setSeriesOpen(false);
+      setManagerClosing(null);
+      managerCloseTimer.current = null;
+    }, 320);
+  }
 
   useEffect(() => {
     fetch("/api/health")
@@ -914,10 +949,10 @@ function App() {
           <span>Image Assistant</span>
         </a>
         <div className="topbar-actions">
-          <button className="icon-button" type="button" onClick={() => { setLibraryOpen(true); void loadLibraryPrompts(); }} title="提示词库" aria-label="打开提示词库">
+          <button className="icon-button" type="button" onClick={() => openManager("library")} title="提示词库" aria-label="打开提示词库">
             <Search size={17} />
           </button>
-          <button className="icon-button" type="button" onClick={() => { setSeriesOpen(true); void loadSeries(); }} title="系列创作" aria-label="打开系列创作">
+          <button className="icon-button" type="button" onClick={() => openManager("series")} title="系列创作" aria-label="打开系列创作">
             <FolderKanban size={17} />
           </button>
           <div className="theme-picker">
@@ -1017,7 +1052,6 @@ function App() {
             <div className="field-label-row">
               <label className="field-label" htmlFor="prompt">提示词</label>
               <div className="prompt-label-actions">
-                <button className="extract-style-button" type="button" onClick={() => setStyleWorkbenchOpen(true)} title="从图片提取风格"><WandSparkles size={13} /> 从图片提取风格</button>
                 <button className="save-prompt-button" type="button" onClick={saveCurrentPrompt} title="保存到提示词库"><Plus size={13} /> 保存</button>
               </div>
             </div>
@@ -1156,26 +1190,44 @@ function App() {
           </section>
           <footer><span>Powered by gpt-image-2</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
         </section>
+        <aside className="extension-rail" aria-label="扩展功能">
+          <button className="extension-tool active" type="button" onClick={() => setStyleWorkbenchOpen(true)} title="从图片提取风格" aria-label="从图片提取风格" data-label="从图片提取风格">
+            <WandSparkles size={20} />
+            <span className="extension-tool-label">提取风格</span>
+          </button>
+          <button className="extension-tool planned" type="button" disabled title="反推提示词（规划中）" aria-label="反推提示词，规划中" data-label="反推提示词（规划中）">
+            <Search size={20} />
+            <span className="extension-tool-label">反推提示</span>
+          </button>
+          <button className="extension-tool planned" type="button" disabled title="画面变体（规划中）" aria-label="画面变体，规划中" data-label="画面变体（规划中）">
+            <Palette size={20} />
+            <span className="extension-tool-label">画面变体</span>
+          </button>
+          <button className="extension-tool planned" type="button" disabled title="更多扩展（规划中）" aria-label="更多扩展，规划中" data-label="更多扩展（规划中）">
+            <Plus size={20} />
+            <span className="extension-tool-label">更多</span>
+          </button>
+        </aside>
       </section>
-      {libraryOpen && (
-        <div className="manager-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setLibraryOpen(false); }}>
+      {(libraryOpen || managerClosing === "library") && (
+        <div className={`manager-backdrop${managerClosing === "library" ? " closing" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeManager("library"); }}>
           <section className="manager-dialog" role="dialog" aria-modal="true" aria-label="提示词库">
-            <div className="manager-toolbar"><strong>提示词库</strong><button className="icon-button" type="button" onClick={() => setLibraryOpen(false)} title="关闭提示词库" aria-label="关闭提示词库"><X size={18} /></button></div>
+            <div className="manager-toolbar"><strong>提示词库</strong><button className="icon-button" type="button" onClick={() => closeManager("library")} title="关闭提示词库" aria-label="关闭提示词库"><X size={18} /></button></div>
             <div className="manager-body">
               <div className="manager-search"><Search size={15} /><input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadLibraryPrompts(); }} placeholder="搜索标题、分类或内容" /><button type="button" onClick={() => void loadLibraryPrompts()}>搜索</button></div>
               <div className="manager-actions"><button type="button" onClick={saveCurrentPrompt}><Plus size={14} /> 保存当前提示词</button><span role="status">{libraryStatus}</span></div>
               <div className="library-list">
-                {libraryPrompts.map((item) => <article className="library-item" key={item.id}><button type="button" className="library-content" onClick={() => { setPrompt(item.content); setLibraryOpen(false); }}><strong>{item.title}</strong><small>{item.category}</small><p>{item.content}</p></button><button type="button" className="icon-button small" onClick={() => void removeLibraryPrompt(item.id)} title="删除提示词" aria-label={"删除提示词：" + item.title}><Trash2 size={14} /></button></article>)}
+                {libraryPrompts.map((item) => <article className="library-item" key={item.id}><button type="button" className="library-content" onClick={() => { setPrompt(item.content); closeManager("library"); }}><strong>{item.title}</strong><small>{item.category}</small><p>{item.content}</p></button><button type="button" className="icon-button small" onClick={() => void removeLibraryPrompt(item.id)} title="删除提示词" aria-label={"删除提示词：" + item.title}><Trash2 size={14} /></button></article>)}
                 {!libraryPrompts.length && <p className="manager-empty">暂无已保存提示词。可以先保存当前提示词。</p>}
               </div>
             </div>
           </section>
         </div>
       )}
-      {seriesOpen && (
-        <div className="manager-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSeriesOpen(false); }}>
+      {(seriesOpen || managerClosing === "series") && (
+        <div className={`manager-backdrop${managerClosing === "series" ? " closing" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeManager("series"); }}>
           <section className="manager-dialog" role="dialog" aria-modal="true" aria-label="系列创作">
-            <div className="manager-toolbar"><strong>系列创作</strong><button className="icon-button" type="button" onClick={() => setSeriesOpen(false)} title="关闭系列创作" aria-label="关闭系列创作"><X size={18} /></button></div>
+            <div className="manager-toolbar"><strong>系列创作</strong><button className="icon-button" type="button" onClick={() => closeManager("series")} title="关闭系列创作" aria-label="关闭系列创作"><X size={18} /></button></div>
             <div className="manager-body series-manager">
               <div className="manager-search"><input value={newSeriesName} onChange={(event) => setNewSeriesName(event.target.value)} placeholder="新系列名称" /><button type="button" onClick={() => void createNewSeries()}><Plus size={14} /> 创建系列</button></div>
               {activeSeries && <div className="storyboard-form"><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="粘贴志怪故事原文或故事梗概，程序会自动拆分成连续画面节点。" rows={5} /><div><button type="button" onClick={() => void createStoryboard()} disabled={storyboardLoading || seriesNodes.length > 0}>{storyboardLoading ? <LoaderCircle className="spin" size={14} /> : <WandSparkles size={14} />}{storyboardLoading ? "正在拆分" : "自动拆分故事"}</button><button type="button" onClick={() => void generateStoryboardImages()} disabled={batchGenerating || !seriesNodes.length}>{batchGenerating ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}{batchGenerating ? "正在批量生成" : "批量生成图片"}</button></div></div>}
@@ -1184,7 +1236,7 @@ function App() {
                 <div className="node-panel">
                   <div className="node-panel-heading"><strong>{activeSeries?.name || "请选择系列"}</strong>{activeSeries && <span>{seriesNodes.length} 个节点</span>}</div>
                   {activeSeries && <div className="manager-search"><input value={newNodeTitle} onChange={(event) => setNewNodeTitle(event.target.value)} placeholder="新故事节点名称" /><button type="button" onClick={() => void createNewNode()}><Plus size={14} /> 添加节点</button></div>}
-                  <div className="node-list">{seriesNodes.map((node) => <button type="button" key={node.id} className={activeNode?.id === node.id ? "node-entry active" : "node-entry"} onClick={() => { setActiveNode(node); if (node.prompt) setPrompt(node.prompt); setSeriesOpen(false); }}><span>{String(node.node_order).padStart(2, "0")}</span><strong>{node.title}</strong><small>{node.status}</small></button>)}</div>
+                  <div className="node-list">{seriesNodes.map((node) => <button type="button" key={node.id} className={activeNode?.id === node.id ? "node-entry active" : "node-entry"} onClick={() => { setActiveNode(node); if (node.prompt) setPrompt(node.prompt); closeManager("series"); }}><span>{String(node.node_order).padStart(2, "0")}</span><strong>{node.title}</strong><small>{node.status}</small></button>)}</div>
                 </div>
               </div>
               {seriesStatus && <p className="manager-status" role="status">{seriesStatus}</p>}

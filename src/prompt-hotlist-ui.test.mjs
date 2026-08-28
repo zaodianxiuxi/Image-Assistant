@@ -200,3 +200,65 @@ test("presents the style extraction workbench as a larger right-side drawer", as
   assert.match(styles, /@keyframes style-drawer-in/);
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.style-workbench \{[^}]*width: 100%[^}]*border-radius: 0/);
 });
+
+test("places style extraction in the right extension rail", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /className="extension-rail"/);
+  assert.match(source, /aria-label="扩展功能"/);
+  assert.match(source, /className="extension-tool active"/);
+  assert.match(source, /onClick=\{\(\) => setStyleWorkbenchOpen\(true\)\}/);
+  assert.match(source, /从图片提取风格/);
+  const promptLabelBlock = source.slice(source.indexOf('className="prompt-label-actions"'), source.indexOf('className="prompt-box"'));
+  assert.doesNotMatch(promptLabelBlock, /从图片提取风格/);
+  assert.match(source, /反推提示词/);
+  assert.match(source, /画面变体/);
+  assert.match(styles, /\.extension-rail \{/);
+  assert.match(styles, /\.extension-tool \{/);
+  assert.match(styles, /@media \(max-width: 850px\)[\s\S]*\.extension-rail/);
+});
+
+test("keeps the extension rail and workspace spacing compact", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.workspace \{ grid-template-columns: 360px minmax\(0, 1fr\) 50px; gap: clamp\(8px, 1vw, 14px\)/);
+  assert.match(styles, /\.extension-tool \{[^}]*width: 44px; height: 44px/);
+  assert.match(styles, /\.extension-rail \{[^}]*gap: 8px[^}]*padding-top: 28px/);
+  assert.match(styles, /\.app-shell \{[^}]*padding: 0 clamp\(14px, 1\.8vw, 28px\)/);
+});
+
+test("keeps extension labels hidden until a tool is hovered or focused", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.doesNotMatch(source, /className="extension-rail-heading"/);
+  assert.match(source, /className="extension-tool-label"/);
+  assert.match(source, /data-label="从图片提取风格"/);
+  assert.match(styles, /\.extension-tool-label \{[^}]*position: absolute/);
+  assert.match(styles, /\.extension-tool:hover::after/);
+  assert.match(styles, /\.extension-tool:focus-visible::after/);
+  assert.match(styles, /transform: scale\(1\.06\)/);
+});
+
+test("presents the prompt library and series manager as top drawers", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.manager-backdrop \{[^}]*place-items: start center[^}]*padding: 0/);
+  assert.match(styles, /\.manager-backdrop \{[^}]*left: calc\(clamp\(14px, 1\.8vw, 28px\) \+ 360px \+ clamp\(8px, 1vw, 14px\)\)/);
+  assert.match(styles, /\.manager-dialog \{[^}]*width: 100%; height: 50dvh/);
+  assert.match(styles, /\.manager-dialog \{[^}]*max-height: 50dvh/);
+  assert.match(styles, /\.manager-dialog \{[^}]*border-radius: 0 0 12px 12px/);
+  assert.match(styles, /@keyframes manager-drawer-in/);
+  assert.match(styles, /\.manager-dialog \{[^}]*animation: manager-drawer-in \.32s ease-out/);
+  assert.match(styles, /\.manager-dialog \{[^}]*will-change: transform/);
+  assert.match(styles, /from \{ opacity: \.72; transform: translateY\(-100%\)/);
+  assert.match(source, /managerClosing/);
+  assert.match(source, /managerClosing === "library" \? " closing" : ""/);
+  assert.match(source, /managerClosing === "series" \? " closing" : ""/);
+  assert.match(styles, /\.manager-backdrop\.closing \.manager-dialog/);
+  assert.match(styles, /@keyframes manager-drawer-out/);
+  assert.match(styles, /animation: manager-drawer-out \.28s ease-in/);
+  assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.manager-backdrop \{[^}]*place-items: start center/);
+});
