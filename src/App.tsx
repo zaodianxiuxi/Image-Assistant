@@ -1117,47 +1117,46 @@ function App() {
               <div className="empty-state"><span className="empty-icon"><Sparkles size={26} /></span><strong>{emptyTitle}</strong><p>填写提示词，然后在这里查看生成结果。</p></div>
             )}
           </div>
+
+          <section className="history-section">
+            <div className="history-heading"><div><span className="eyebrow">本地图库</span><h2>图片合集</h2></div>{historyLoading ? <span>正在读取</span> : history.length > 0 && <span>{history.length} 张图片</span>}</div>
+              {history.length ? (
+                <div className="gallery-groups">
+                  {groupedHistory.map((group) => (
+                    <section className="gallery-group" key={group.key}>
+                      <div className="gallery-group-heading"><strong>{group.title}</strong><span>{group.nodes.reduce((total, node) => total + node.items.length, 0)} 张</span></div>
+                      <div className="gallery-node-groups">
+                        {group.nodes.map((node) => (
+                          <section className="gallery-node-group" key={node.key}>
+                            {(() => {
+                              const nodeStateKey = `${group.key}:${node.key}`;
+                              const nodeCollapsed = collapsedGalleryNodes.has(nodeStateKey);
+                              return (
+                                <>
+                                  <div className="gallery-node-heading">
+                                    <button className="gallery-node-toggle" type="button" onClick={() => toggleGalleryNode(nodeStateKey)} aria-expanded={!nodeCollapsed}>
+                                      <ChevronDown size={14} className={nodeCollapsed ? "is-collapsed" : ""} />
+                                      <strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong>
+                                    </button>
+                                    <span>{node.items.length} 张</span>
+                                  </div>
+                                  {!nodeCollapsed && <div className="history-grid">{node.items.map(renderHistoryItem)}</div>}
+                                </>
+                              );
+                            })()}
+                          </section>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+            ) : (
+              <div className="history-empty"><Clock3 size={18} /> 还没有已保存的图片。</div>
+            )}
+          </section>
+          <footer><span>Powered by gpt-image-2</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
         </section>
       </section>
-
-      <section className="history-section">
-        <div className="history-heading"><div><span className="eyebrow">本地图库</span><h2>图片合集</h2></div>{historyLoading ? <span>正在读取</span> : history.length > 0 && <span>{history.length} 张图片</span>}</div>
-          {history.length ? (
-            <div className="gallery-groups">
-              {groupedHistory.map((group) => (
-                <section className="gallery-group" key={group.key}>
-                  <div className="gallery-group-heading"><strong>{group.title}</strong><span>{group.nodes.reduce((total, node) => total + node.items.length, 0)} 张</span></div>
-                  <div className="gallery-node-groups">
-                    {group.nodes.map((node) => (
-                      <section className="gallery-node-group" key={node.key}>
-                        {(() => {
-                          const nodeStateKey = `${group.key}:${node.key}`;
-                          const nodeCollapsed = collapsedGalleryNodes.has(nodeStateKey);
-                          return (
-                            <>
-                              <div className="gallery-node-heading">
-                                <button className="gallery-node-toggle" type="button" onClick={() => toggleGalleryNode(nodeStateKey)} aria-expanded={!nodeCollapsed}>
-                                  <ChevronDown size={14} className={nodeCollapsed ? "is-collapsed" : ""} />
-                                  <strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong>
-                                </button>
-                                <span>{node.items.length} 张</span>
-                              </div>
-                              {!nodeCollapsed && <div className="history-grid">{node.items.map(renderHistoryItem)}</div>}
-                            </>
-                          );
-                        })()}
-                      </section>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-        ) : (
-          <div className="history-empty"><Clock3 size={18} /> 还没有已保存的图片。</div>
-        )}
-      </section>
-
-      <footer><span>Powered by gpt-image-2</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
       {libraryOpen && (
         <div className="manager-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setLibraryOpen(false); }}>
           <section className="manager-dialog" role="dialog" aria-modal="true" aria-label="提示词库">

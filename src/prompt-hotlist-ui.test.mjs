@@ -151,3 +151,17 @@ test("opens a structured image-to-prompt workbench without automatic generation"
   assert.doesNotMatch(workbench, /\/api\/images\/(?:generate|edit)/);
   assert.match(styles, /\.style-workbench/);
 });
+
+test("keeps the desktop workbench fixed and uses a readable Chinese type scale", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /font-family: .*PingFang SC.*Microsoft YaHei/);
+  assert.doesNotMatch(styles, /@import url\("https:\/\/fonts\.googleapis\.com/);
+  assert.match(styles, /\.topbar \{[^}]*position: sticky/);
+  assert.match(styles, /\.control-panel \{[^}]*position: sticky/);
+  assert.match(styles, /\.workspace \{[^}]*height: calc\(100dvh/);
+  assert.match(styles, /\.workspace > \.canvas-panel \{[^}]*overflow: auto/);
+  assert.match(styles, /\.field-label \{[^}]*font-size: 13px/);
+  assert.match(styles, /\.prompt-box textarea \{[^}]*font-size: 14px/);
+  assert.match(styles, /@media \(max-width: 850px\)[\s\S]*\.workspace \{[^}]*height: auto/);
+});

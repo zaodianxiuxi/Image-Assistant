@@ -1,6 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap");
-
-:root { --surface-page: #edf1f5; --surface-panel: #ffffff; --surface-subtle: #f6f8fb; --surface-canvas: #f8fafc; --text-strong: #172033; --text-muted: #617089; --border-subtle: #dce3ec; --accent: #2463eb; --accent-soft: #eaf0ff; --success: #178252; --danger: #b42318; font-family: "Manrope", "Microsoft YaHei", sans-serif; color: var(--text-strong); background: var(--surface-page); font-synthesis: none; }
+:root { --surface-page: #edf1f5; --surface-panel: #ffffff; --surface-subtle: #f6f8fb; --surface-canvas: #f8fafc; --text-strong: #172033; --text-muted: #617089; --border-subtle: #dce3ec; --accent: #2463eb; --accent-soft: #eaf0ff; --success: #178252; --danger: #b42318; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; color: var(--text-strong); background: var(--surface-page); font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, textarea, select { font: inherit; }
@@ -124,6 +122,59 @@ body, .app-shell { color: var(--text-strong); background: var(--surface-page); }
 
 @media (max-width: 850px) { .control-panel { position: static; max-height: none; overflow: visible; }.canvas { min-height: 440px; } }
 @media (max-width: 500px) { .app-shell { padding: 0 14px; }.theme-menu { right: -42px; width: min(250px, calc(100vw - 28px)); } }
+
+/* Keep the creation controls available while the result and gallery scroll independently on desktop. */
+body { font-size: 14px; line-height: 1.55; }
+.app-shell { height: 100dvh; overflow: hidden; }
+.topbar { position: sticky; top: 0; z-index: 20; background: var(--surface-page); }
+.activity-banner { position: sticky; top: 76px; z-index: 19; margin-bottom: 0; font-size: 12px; }
+.workspace { height: calc(100dvh - 134px); min-height: 0; overflow: hidden; padding-bottom: 22px; }
+.control-panel { position: sticky; top: 12px; height: 100%; max-height: none; overflow-y: auto; scrollbar-gutter: stable; }
+.workspace > .canvas-panel { height: 100%; overflow: auto; scrollbar-gutter: stable; padding-right: 4px; }
+.canvas-panel { min-height: 0; }
+.canvas { height: clamp(440px, calc(100dvh - 300px), 680px); min-height: 0; flex: 0 0 auto; }
+.history-section { flex: 0 0 auto; }
+
+.mode-switch button { font-size: 14px; }
+.field-label { font-size: 13px; }
+.prompt-box textarea { font-size: 14px; line-height: 1.65; }
+.select-wrap select { font-size: 14px; }
+.generate-button { font-size: 15px; }
+.activity-banner, .form-error { line-height: 1.55; }
+.setup-note, .reference-note { font-size: 12px; line-height: 1.55; }
+.hotlist-heading { font-size: 12px; }
+.hotlist-heading small { font-size: 11px; }
+.hotlist-copy strong { font-size: 12px; }
+.hotlist-copy small, .hotlist-copy em, .hotlist-status { font-size: 11px; }
+.canvas-heading h1 { font-size: 20px; }
+.eyebrow { font-size: 11px; }
+.empty-state strong, .loading-state strong { font-size: 16px; }
+.empty-state p, .loading-state p { font-size: 13px; }
+.file-preview strong { font-size: 12px; }
+.file-preview span { font-size: 11px; }
+.history-heading h2 { font-size: 18px; }
+.history-heading > span, .history-item > div > span { font-size: 12px; }
+.history-prompt { font-size: 12px; line-height: 1.55; }
+.gallery-group-heading { font-size: 13px; }
+.gallery-node-heading { font-size: 12px; }
+.manager-body, .manager-search input, .manager-actions, .manager-status { font-size: 12px; }
+
+@media (max-width: 850px) {
+  .app-shell { height: auto; min-height: 100dvh; overflow: visible; }
+  .topbar { position: sticky; top: 0; }
+  .activity-banner { top: 68px; }
+  .workspace { height: auto; min-height: 0; overflow: visible; }
+  .workspace > .canvas-panel { height: auto; overflow: visible; padding-right: 0; }
+  .control-panel { position: static; height: auto; max-height: none; overflow: visible; }
+  .canvas { height: auto; min-height: 440px; }
+}
+
+@media (max-width: 500px) {
+  .activity-banner { position: static; margin-top: 10px; }
+  .canvas { min-height: 380px; }
+  .topbar-actions { gap: 11px; font-size: 12px; }
+  .history-heading h2 { font-size: 17px; }
+}
 
 .prompt-label-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .extract-style-button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; color: var(--accent); background: transparent; font-size: 11px; font-weight: 750; white-space: nowrap; }
