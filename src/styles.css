@@ -1,4 +1,4 @@
-:root { --surface-page: #edf1f5; --surface-panel: #ffffff; --surface-subtle: #f6f8fb; --surface-canvas: #f8fafc; --text-strong: #172033; --text-muted: #617089; --border-subtle: #dce3ec; --accent: #2463eb; --accent-soft: #eaf0ff; --success: #178252; --danger: #b42318; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; color: var(--text-strong); background: var(--surface-page); font-synthesis: none; }
+:root { --surface-page: #edf1f5; --surface-panel: #ffffff; --surface-subtle: #f6f8fb; --surface-canvas: #f8fafc; --text-strong: #172033; --text-muted: #617089; --border-subtle: #dce3ec; --accent: #2463eb; --accent-soft: #eaf0ff; --success: #178252; --danger: #b42318; font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif; color: var(--text-strong); background: var(--surface-page); font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, textarea, select { font: inherit; }
@@ -174,6 +174,70 @@ body { font-size: 14px; line-height: 1.55; }
   .canvas { min-height: 380px; }
   .topbar-actions { gap: 11px; font-size: 12px; }
   .history-heading h2 { font-size: 17px; }
+}
+
+/* Keep gallery cards compact while making the information around them easier to scan. */
+.history-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.history-item > button { aspect-ratio: 1.45; padding: 5px; }
+.history-item > div { padding: 8px; }
+.history-item > div > span { font-size: 12px; }
+.history-prompt { margin: 0 8px 9px; font-size: 13px; line-height: 1.5; }
+.gallery-group-heading { font-size: 14px; }
+.gallery-group-heading span { font-size: 11px; }
+.gallery-node-heading { font-size: 13px; }
+.gallery-node-heading span { font-size: 11px; }
+.history-actions { gap: 7px; padding: 0 8px 10px; }
+.history-actions button { min-height: 30px; padding: 0 8px; font-size: 11px; }
+
+/* Thin, visible scrollbars make the independent desktop panels discoverable without adding visual weight. */
+.control-panel,
+.workspace > .canvas-panel,
+.manager-body,
+.style-workbench-body,
+.image-preview-dialog > p {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted), transparent 28%) transparent;
+}
+.control-panel::-webkit-scrollbar,
+.workspace > .canvas-panel::-webkit-scrollbar,
+.manager-body::-webkit-scrollbar,
+.style-workbench-body::-webkit-scrollbar,
+.image-preview-dialog > p::-webkit-scrollbar { width: 9px; height: 9px; }
+.control-panel::-webkit-scrollbar-track,
+.workspace > .canvas-panel::-webkit-scrollbar-track,
+.manager-body::-webkit-scrollbar-track,
+.style-workbench-body::-webkit-scrollbar-track,
+.image-preview-dialog > p::-webkit-scrollbar-track { background: transparent; }
+.control-panel::-webkit-scrollbar-thumb,
+.workspace > .canvas-panel::-webkit-scrollbar-thumb,
+.manager-body::-webkit-scrollbar-thumb,
+.style-workbench-body::-webkit-scrollbar-thumb,
+.image-preview-dialog > p::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted), transparent 28%);
+  background-clip: padding-box;
+}
+.control-panel::-webkit-scrollbar-thumb:hover,
+.workspace > .canvas-panel::-webkit-scrollbar-thumb:hover,
+.manager-body::-webkit-scrollbar-thumb:hover,
+.style-workbench-body::-webkit-scrollbar-thumb:hover,
+.image-preview-dialog > p::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+  background-clip: padding-box;
+}
+
+/* Lift the smallest labels and helper copy one step for comfortable Chinese reading. */
+.hotlist-heading { font-size: 13px; }
+.hotlist-heading small { font-size: 11px; }
+.hotlist-copy strong { font-size: 13px; }
+.hotlist-copy small, .hotlist-copy em, .hotlist-status { font-size: 12px; }
+.hotlist-copy em { line-height: 1.5; }
+.reference-note, .setup-note { font-size: 13px; }
+.activity-banner, .form-error { font-size: 13px; }
+
+@media (max-width: 850px) {
+  .history-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .prompt-label-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }

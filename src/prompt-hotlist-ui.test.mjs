@@ -155,7 +155,7 @@ test("opens a structured image-to-prompt workbench without automatic generation"
 test("keeps the desktop workbench fixed and uses a readable Chinese type scale", async () => {
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
-  assert.match(styles, /font-family: .*PingFang SC.*Microsoft YaHei/);
+  assert.match(styles, /font-family: .*Microsoft YaHei UI.*Microsoft YaHei.*PingFang SC/);
   assert.doesNotMatch(styles, /@import url\("https:\/\/fonts\.googleapis\.com/);
   assert.match(styles, /\.topbar \{[^}]*position: sticky/);
   assert.match(styles, /\.control-panel \{[^}]*position: sticky/);
@@ -164,4 +164,15 @@ test("keeps the desktop workbench fixed and uses a readable Chinese type scale",
   assert.match(styles, /\.field-label \{[^}]*font-size: 13px/);
   assert.match(styles, /\.prompt-box textarea \{[^}]*font-size: 14px/);
   assert.match(styles, /@media \(max-width: 850px\)[\s\S]*\.workspace \{[^}]*height: auto/);
+});
+
+test("keeps gallery thumbnails compact and gives scroll containers a visible scrollbar", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.history-grid \{[^}]*minmax\(180px, 1fr\)/);
+  assert.match(styles, /\.workspace > \.canvas-panel::-webkit-scrollbar/);
+  assert.match(styles, /\.control-panel::-webkit-scrollbar-thumb/);
+  assert.match(styles, /\.history-prompt \{[^}]*font-size: 13px/);
+  assert.match(styles, /\.history-actions button \{[^}]*font-size: 11px/);
+  assert.match(styles, /\.workspace > \.canvas-panel::-webkit-scrollbar-thumb:hover/);
 });
