@@ -370,7 +370,7 @@ body { font-size: 14px; line-height: 1.55; }
 
 /* Use the style extractor as a spacious right-side drawer on desktop. */
 .style-workbench-backdrop { place-items: stretch end; padding: 0; }
-.style-workbench { width: min(1080px, 75vw); height: 100%; max-height: none; border-radius: 14px 0 0 14px; animation: style-drawer-in .24s ease-out; }
+.style-workbench { width: 75vw; height: 100%; max-height: none; border-radius: 14px 0 0 14px; animation: style-drawer-in .24s ease-out; }
 .style-workbench-body { grid-template-columns: 300px minmax(0, 1fr); }
 
 @keyframes style-drawer-in {

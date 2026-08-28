@@ -193,7 +193,8 @@ test("presents the style extraction workbench as a larger right-side drawer", as
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
   assert.match(styles, /\.style-workbench-backdrop \{[^}]*place-items: stretch end/);
-  assert.match(styles, /\.style-workbench \{[^}]*width: min\(1080px, 75vw\)/);
+  assert.match(styles, /\.style-workbench \{[^}]*width: 75vw/);
+  assert.doesNotMatch(styles, /\.style-workbench \{[^}]*1080px/);
   assert.match(styles, /\.style-workbench \{[^}]*height: 100%/);
   assert.match(styles, /\.style-workbench \{[^}]*border-radius: 14px 0 0 14px/);
   assert.match(styles, /@keyframes style-drawer-in/);
