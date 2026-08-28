@@ -176,3 +176,15 @@ test("keeps gallery thumbnails compact and gives scroll containers a visible scr
   assert.match(styles, /\.history-actions button \{[^}]*font-size: 11px/);
   assert.match(styles, /\.workspace > \.canvas-panel::-webkit-scrollbar-thumb:hover/);
 });
+
+test("makes the style extraction workbench readable and less dense", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.style-workbench-toolbar strong \{[^}]*font-size: 15px/);
+  assert.match(styles, /\.style-workbench-section \{[^}]*padding: 20px/);
+  assert.match(styles, /\.style-section-heading strong \{[^}]*font-size: 13px/);
+  assert.match(styles, /\.style-analysis-field strong, \.style-compose-field strong \{[^}]*font-size: 13px/);
+  assert.match(styles, /\.style-analysis-field small, \.style-compose-field small \{[^}]*font-size: 11px/);
+  assert.match(styles, /\.style-analysis-field textarea, \.style-compose-field textarea \{[^}]*font-size: 13px/);
+  assert.match(styles, /\.style-inline-actions button, \.style-save-profile, \.style-compose-button, \.style-apply-button, \.style-series-placeholder button \{[^}]*font-size: 12px/);
+});
