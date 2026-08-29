@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -7,8 +7,11 @@ import {
   Clock3,
   Download,
   Eraser,
+  Eye,
+  EyeOff,
   FolderKanban,
   ImagePlus,
+  KeyRound,
   LoaderCircle,
   Moon,
   Palette,
@@ -20,7 +23,10 @@ import {
   Trash2,
   Upload,
   WandSparkles,
-  X
+  X,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut
 } from "lucide-react";
 import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 import type { PromptHotlistItem } from "./prompt-hotlist.mjs";
@@ -125,9 +131,11 @@ function App() {
   const [current, setCurrent] = useState<Result | null>(null);
   const [history, setHistory] = useState<Result[]>([]);
   const [versionParent, setVersionParent] = useState<Result | null>(null);
+  const [collapsedGalleryGroups, setCollapsedGalleryGroups] = useState<Set<string>>(() => new Set());
   const [collapsedGalleryNodes, setCollapsedGalleryNodes] = useState<Set<string>>(() => new Set());
   const [historyLoading, setHistoryLoading] = useState(true);
   const [preview, setPreview] = useState<Result | null>(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [failedImageSources, setFailedImageSources] = useState<Set<string>>(() => new Set());
@@ -135,6 +143,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [apiReady, setApiReady] = useState<boolean | null>(null);
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState("");
+  const [apiKeyError, setApiKeyError] = useState("");
   const [databaseConfigured, setDatabaseConfigured] = useState(false);
   const [executionStage, setExecutionStage] = useState<ExecutionStage>("idle");
   const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
@@ -167,6 +181,9 @@ function App() {
   const maskInput = useRef<HTMLInputElement>(null);
   const inputLogged = useRef(false);
   const previewUrls = useRef(new Set<string>());
+  const previewMediaRef = useRef<HTMLDivElement>(null);
+  const previewDragRef = useRef<{ pointerId: number; startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const galleryCollapseInitialized = useRef(false);
   const managerCloseTimer = useRef<number | null>(null);
 
   function clearManagerCloseTimer() {
@@ -273,11 +290,18 @@ function App() {
   useEffect(() => {
     if (!preview) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPreview(null);
+      if (event.key === "Escape") closePreview();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [preview]);
+
+  useEffect(() => {
+    const media = previewMediaRef.current;
+    if (!preview || !media) return;
+    media.addEventListener("wheel", handlePreviewWheel, { passive: false });
+    return () => media.removeEventListener("wheel", handlePreviewWheel);
+  }, [preview, previewZoom]);
 
   useEffect(() => {
     if (!themeMenuOpen) return;
@@ -287,6 +311,15 @@ function App() {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [themeMenuOpen]);
+
+  useEffect(() => {
+    if (!apiSettingsOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeApiSettings();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [apiSettingsOpen]);
 
   useEffect(() => {
     if (!loading || !requestStartedAt) {
@@ -310,9 +343,72 @@ function App() {
   );
   const groupedHistory = useMemo(() => groupHistoryRecords(history), [history]);
 
+  useEffect(() => {
+    if (galleryCollapseInitialized.current || historyLoading || !groupedHistory.length) return;
+    setCollapsedGalleryGroups(new Set(groupedHistory.map((group) => group.key)));
+    galleryCollapseInitialized.current = true;
+  }, [groupedHistory, historyLoading]);
+
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
     setError("");
+  }
+
+  function openApiSettings() {
+    setApiSettingsOpen(true);
+    setApiKeyInput("");
+    setApiKeyVisible(false);
+    setApiKeyError("");
+    setApiKeyStatus(apiReady ? "已配置" : apiReady === false ? "未配置" : "正在读取");
+    void fetch("/api/settings")
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await readApiError(response));
+        return response.json();
+      })
+      .then((data) => {
+        const configured = Boolean(data.apiKeyConfigured);
+        setApiReady(configured);
+        setApiKeyStatus(configured ? "已配置" : "未配置");
+      })
+      .catch((requestError) => setApiKeyError(requestError instanceof Error ? requestError.message : "无法读取当前配置。"));
+  }
+
+  function closeApiSettings() {
+    setApiSettingsOpen(false);
+    setApiKeyInput("");
+    setApiKeyVisible(false);
+    setApiKeyError("");
+    setApiKeyStatus("");
+  }
+
+  async function saveApiKeyConfiguration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const apiKey = apiKeyInput.trim();
+    if (!apiKey || apiKeySaving) return;
+    setApiKeySaving(true);
+    setApiKeyError("");
+    setApiKeyStatus("正在保存");
+    try {
+      const response = await fetch("/api/settings/api-key", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      setApiReady(Boolean(data.configured));
+      setApiKeyInput("");
+      setApiKeyVisible(false);
+      setApiKeyStatus("已保存");
+      setActivityStatus("API Key 已保存，可以开始创作。");
+      setActivityTone("success");
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "保存 API Key 失败。";
+      setApiKeyError(message);
+      setApiKeyStatus("");
+    } finally {
+      setApiKeySaving(false);
+    }
   }
 
   function logClientEvent(event: string, details: Record<string, unknown> = {}) {
@@ -685,11 +781,18 @@ function App() {
   }
 
   function clearReferenceImage(index: number) {
+    const cancelingHistoryEdit = referenceImages.length === 1 && Boolean(versionParent);
     setReferenceImages((images) => {
       const removed = images[index];
       if (removed) releasePreview(removed.preview);
       return images.filter((_, imageIndex) => imageIndex !== index);
     });
+    if (cancelingHistoryEdit) {
+      handlePromptChange("");
+      setVersionParent(null);
+      setActivityStatus("已取消历史图片编辑，可以重新上传图片。 ");
+      setActivityTone("idle");
+    }
     logClientEvent("reference_image_removed", { referenceCount: Math.max(referenceImages.length - 1, 0) });
   }
 
@@ -702,6 +805,67 @@ function App() {
 
   function openPreview(result: Result) {
     setPreview(result);
+    setPreviewZoom(1);
+  }
+
+  function closePreview() {
+    setPreview(null);
+    setPreviewZoom(1);
+  }
+
+  function changePreviewZoom(delta: number) {
+    setPreviewZoom((currentZoom) => Math.min(3, Math.max(0.5, Number((currentZoom + delta).toFixed(2)))));
+  }
+
+  function handlePreviewWheel(event: WheelEvent) {
+    if (!event.ctrlKey || !preview) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const media = previewMediaRef.current;
+    if (!media) return;
+    const previousZoom = previewZoom;
+    const nextZoom = Math.min(3, Math.max(0.5, Number((previousZoom + (event.deltaY < 0 ? 0.1 : -0.1)).toFixed(2))));
+    if (nextZoom === previousZoom) return;
+    const mediaRect = media.getBoundingClientRect();
+    const anchorX = event.clientX - mediaRect.left;
+    const anchorY = event.clientY - mediaRect.top;
+    const zoomRatio = nextZoom / previousZoom;
+    setPreviewZoom(nextZoom);
+    window.requestAnimationFrame(() => {
+      media.scrollLeft = Math.max(0, (media.scrollLeft + anchorX) * zoomRatio - anchorX);
+      media.scrollTop = Math.max(0, (media.scrollTop + anchorY) * zoomRatio - anchorY);
+    });
+  }
+
+  function handlePreviewPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || previewZoom <= 1) return;
+    const media = previewMediaRef.current;
+    if (!media) return;
+    previewDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: media.scrollLeft,
+      scrollTop: media.scrollTop
+    };
+    media.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  function handlePreviewPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = previewDragRef.current;
+    const media = previewMediaRef.current;
+    if (!drag || !media || drag.pointerId !== event.pointerId) return;
+    media.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX);
+    media.scrollTop = drag.scrollTop - (event.clientY - drag.startY);
+  }
+
+  function handlePreviewPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const media = previewMediaRef.current;
+    if (media && previewDragRef.current?.pointerId === event.pointerId && media.hasPointerCapture(event.pointerId)) {
+      media.releasePointerCapture(event.pointerId);
+    }
+    previewDragRef.current = null;
   }
 
   async function continueEditing(result: Result) {
@@ -756,6 +920,15 @@ function App() {
 
   function toggleGalleryNode(key: string) {
     setCollapsedGalleryNodes((collapsed) => {
+      const next = new Set(collapsed);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleGalleryGroup(key: string) {
+    setCollapsedGalleryGroups((collapsed) => {
       const next = new Set(collapsed);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -955,6 +1128,9 @@ function App() {
           <button className="icon-button" type="button" onClick={() => openManager("series")} title="系列创作" aria-label="打开系列创作">
             <FolderKanban size={17} />
           </button>
+          <button className="icon-button" type="button" onClick={openApiSettings} title="配置 API" aria-label="打开 API 配置">
+            <KeyRound size={17} />
+          </button>
           <div className="theme-picker">
             <button
               className="icon-button theme-toggle"
@@ -1073,7 +1249,7 @@ function App() {
             {referenceImages.length > 0 && <p className="reference-note canvas-note">参考图仅提供内容和风格参考，输出将按所选画幅生成。</p>}
 
             {error && <p className="form-error" role="alert">{error}</p>}
-            {!apiReady && <p className="setup-note"><CheckCircle2 size={15} /> 在 `.env` 配置 `SUDOCODE_API_KEY` 后即可调用。</p>}
+            {!apiReady && <p className="setup-note"><KeyRound size={15} /> <button className="setup-link" type="button" onClick={openApiSettings}>配置 API Key</button></p>}
 
             <button className="generate-button" type="submit" disabled={loading}>
               {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
@@ -1158,29 +1334,42 @@ function App() {
                 <div className="gallery-groups">
                   {groupedHistory.map((group) => (
                     <section className="gallery-group" key={group.key}>
-                      <div className="gallery-group-heading"><strong>{group.title}</strong><span>{group.nodes.reduce((total, node) => total + node.items.length, 0)} 张</span></div>
-                      <div className="gallery-node-groups">
-                        {group.nodes.map((node) => (
-                          <section className="gallery-node-group" key={node.key}>
-                            {(() => {
-                              const nodeStateKey = `${group.key}:${node.key}`;
-                              const nodeCollapsed = collapsedGalleryNodes.has(nodeStateKey);
-                              return (
-                                <>
-                                  <div className="gallery-node-heading">
-                                    <button className="gallery-node-toggle" type="button" onClick={() => toggleGalleryNode(nodeStateKey)} aria-expanded={!nodeCollapsed}>
-                                      <ChevronDown size={14} className={nodeCollapsed ? "is-collapsed" : ""} />
-                                      <strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong>
-                                    </button>
-                                    <span>{node.items.length} 张</span>
-                                  </div>
-                                  {!nodeCollapsed && <div className="history-grid">{node.items.map(renderHistoryItem)}</div>}
-                                </>
-                              );
-                            })()}
-                          </section>
-                        ))}
-                      </div>
+                      {(() => {
+                        const groupCollapsed = collapsedGalleryGroups.has(group.key);
+                        return (
+                          <>
+                            <div className="gallery-group-heading">
+                              <button className="gallery-group-toggle" type="button" onClick={() => toggleGalleryGroup(group.key)} aria-expanded={!groupCollapsed}>
+                                <ChevronDown size={16} className={groupCollapsed ? "is-collapsed" : ""} />
+                                <strong>{group.title}</strong>
+                              </button>
+                              <span>{group.nodes.reduce((total, node) => total + node.items.length, 0)} 张</span>
+                            </div>
+                            {!groupCollapsed && <div className="gallery-node-groups">
+                              {group.nodes.map((node) => (
+                                <section className="gallery-node-group" key={node.key}>
+                                  {(() => {
+                                    const nodeStateKey = `${group.key}:${node.key}`;
+                                    const nodeCollapsed = collapsedGalleryNodes.has(nodeStateKey);
+                                    return (
+                                      <>
+                                        <div className="gallery-node-heading">
+                                          <button className="gallery-node-toggle" type="button" onClick={() => toggleGalleryNode(nodeStateKey)} aria-expanded={!nodeCollapsed}>
+                                            <ChevronDown size={14} className={nodeCollapsed ? "is-collapsed" : ""} />
+                                            <strong>{node.nodeOrder === null ? node.title : `${String(node.nodeOrder).padStart(2, "0")} · ${node.title}`}</strong>
+                                          </button>
+                                          <span>{node.items.length} 张</span>
+                                        </div>
+                                        {!nodeCollapsed && <div className="history-grid">{node.items.map(renderHistoryItem)}</div>}
+                                      </>
+                                    );
+                                  })()}
+                                </section>
+                              ))}
+                            </div>}
+                          </>
+                        );
+                      })()}
                     </section>
                   ))}
                 </div>
@@ -1209,6 +1398,25 @@ function App() {
           </button>
         </aside>
       </section>
+      {apiSettingsOpen && (
+        <div className="api-settings-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeApiSettings(); }}>
+          <section className="api-settings-dialog" role="dialog" aria-modal="true" aria-label="API 配置">
+            <div className="api-settings-toolbar">
+              <div><strong>API 配置</strong><span role="status">{apiKeyStatus}</span></div>
+              <button className="icon-button" type="button" onClick={closeApiSettings} title="关闭 API 配置" aria-label="关闭 API 配置"><X size={18} /></button>
+            </div>
+            <form className="api-settings-form" onSubmit={(event) => void saveApiKeyConfiguration(event)}>
+              <label htmlFor="api-key-input">访问密钥</label>
+              <div className="api-key-input-wrap">
+                <input id="api-key-input" type={apiKeyVisible ? "text" : "password"} value={apiKeyInput} onChange={(event) => setApiKeyInput(event.target.value)} placeholder="粘贴 API Key" autoComplete="off" autoFocus spellCheck={false} />
+                <button className="icon-button" type="button" onClick={() => setApiKeyVisible((visible) => !visible)} title={apiKeyVisible ? "隐藏密钥" : "显示密钥"} aria-label={apiKeyVisible ? "隐藏密钥" : "显示密钥"}>{apiKeyVisible ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+              </div>
+              {apiKeyError && <p className="api-settings-error" role="alert">{apiKeyError}</p>}
+              <button className="api-settings-save" type="submit" disabled={!apiKeyInput.trim() || apiKeySaving}>{apiKeySaving ? <LoaderCircle className="spin" size={17} /> : <KeyRound size={17} />}{apiKeySaving ? "正在保存" : "保存并启用"}</button>
+            </form>
+          </section>
+        </div>
+      )}
       {(libraryOpen || managerClosing === "library") && (
         <div className={`manager-backdrop${managerClosing === "library" ? " closing" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeManager("library"); }}>
           <section className="manager-dialog" role="dialog" aria-modal="true" aria-label="提示词库">
@@ -1257,14 +1465,30 @@ function App() {
         }}
       />
       {preview && (
-        <div className="image-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
+        <div className="image-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closePreview(); }}>
           <section className="image-preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">
-            <div className="image-preview-toolbar"><span>{preview.kind === "generate" ? "生成图片预览" : "编辑图片预览"}</span><button className="icon-button" type="button" onClick={() => setPreview(null)} title="关闭预览" aria-label="关闭预览"><X size={18} /></button></div>
-            <div className="image-preview-media">
+            <div className="image-preview-toolbar">
+              <span>{preview.kind === "generate" ? "生成图片预览" : "编辑图片预览"}</span>
+              <div className="image-preview-controls" aria-label="图片缩放控制">
+                <button className="icon-button" type="button" onClick={() => changePreviewZoom(-0.25)} disabled={previewZoom <= 0.5} title="缩小图片" aria-label="缩小图片"><ZoomOut size={17} /></button>
+                <span className="image-preview-zoom" aria-live="polite">{Math.round(previewZoom * 100)}%</span>
+                <button className="icon-button" type="button" onClick={() => changePreviewZoom(0.25)} disabled={previewZoom >= 3} title="放大图片" aria-label="放大图片"><ZoomIn size={17} /></button>
+                <button className="icon-button" type="button" onClick={() => setPreviewZoom(1)} disabled={previewZoom === 1} title="重置图片大小" aria-label="重置图片大小"><RotateCcw size={16} /></button>
+                <button className="icon-button" type="button" onClick={closePreview} title="关闭预览" aria-label="关闭预览"><X size={18} /></button>
+              </div>
+            </div>
+            <div
+              ref={previewMediaRef}
+              className={`image-preview-media${previewZoom > 1 ? " is-zoomed" : ""}`}
+              onPointerDown={handlePreviewPointerDown}
+              onPointerMove={handlePreviewPointerMove}
+              onPointerUp={handlePreviewPointerUp}
+              onPointerCancel={handlePreviewPointerUp}
+            >
               {failedImageSources.has(preview.src) ? (
                 <div className="image-load-error" role="alert"><strong>图片加载失败</strong><button type="button" onClick={() => retryImage(preview.src)}><RefreshCw size={14} /> 重新加载</button></div>
               ) : (
-                <img key={`${preview.id}-${imageRetries[preview.src] || 0}`} src={getImageSource(preview.src)} data-image-source={preview.src} alt={preview.prompt} onError={handleImageError} />
+                <img key={`${preview.id}-${imageRetries[preview.src] || 0}`} src={getImageSource(preview.src)} data-image-source={preview.src} alt={preview.prompt} draggable={false} style={{ transform: `scale(${previewZoom})` }} onError={handleImageError} />
               )}
             </div>
             <p>{preview.prompt}</p>

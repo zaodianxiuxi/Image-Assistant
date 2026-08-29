@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import express from "express";
 import multer from "multer";
@@ -17,6 +18,7 @@ import {
   hasUploadSizeWithinLimit
 } from "./upload-limits.mjs";
 import { DEFAULT_IMAGE_SIZE, isSupportedImageSize } from "./image-sizes.mjs";
+import { saveApiKey } from "./local-config.mjs";
 import { PROMPT_HOTLIST } from "../src/prompt-hotlist.mjs";
 import {
   createSeries,
@@ -42,6 +44,7 @@ const upload = multer({
 });
 const port = Number(process.env.PORT || 3001);
 const apiBase = (process.env.SUDOCODE_BASE_URL || "https://api.sudocode.chat/v1").replace(/\/$/, "");
+const envFile = process.env.IMAGE_ASSISTANT_ENV_FILE || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".env");
 let generatedImageDirectoryPromise;
 
 app.use(express.json({ limit: "1mb" }));
@@ -89,6 +92,10 @@ function requireApiKey(req, res) {
 
 function headers() {
   return { Authorization: `Bearer ${process.env.SUDOCODE_API_KEY}` };
+}
+
+function isLocalRequest(req) {
+  return ["::1", "127.0.0.1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress || "");
 }
 
 async function updateNodeStatus(nodeId, status, requestId) {
@@ -206,6 +213,30 @@ app.get("/api/health", (_req, res) => {
     databaseConfigured: isDatabaseConfigured(),
     baseUrl: apiBase
   });
+});
+
+app.get("/api/settings", (_req, res) => {
+  res.json({ apiKeyConfigured: Boolean(process.env.SUDOCODE_API_KEY) });
+});
+
+app.put("/api/settings/api-key", async (req, res) => {
+  if (!isLocalRequest(req)) {
+    sendError(req, res, 403, "密钥配置仅允许在本机操作。");
+    return;
+  }
+  const apiKey = typeof req.body?.apiKey === "string" ? req.body.apiKey.trim() : "";
+  if (!apiKey || apiKey.length > 2048 || /[\r\n]/.test(apiKey)) {
+    sendError(req, res, 400, "请输入有效的 API Key。");
+    return;
+  }
+  try {
+    await saveApiKey(envFile, apiKey);
+    process.env.SUDOCODE_API_KEY = apiKey;
+    log("api_key_configured", { requestId: req.requestId });
+    res.json({ configured: true });
+  } catch (error) {
+    sendError(req, res, 500, "保存 API Key 失败。", { operation: "api_key_config", ...errorDetails(error) });
+  }
 });
 
 app.get("/api/prompts", async (req, res) => {

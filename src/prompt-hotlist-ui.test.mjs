@@ -54,6 +54,56 @@ test("opens generated and history images in a resilient preview with a saved the
   assert.match(styles, /prefers-reduced-motion/);
 });
 
+test("provides zoom controls and a larger scrollable image preview", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /previewZoom/);
+  assert.match(source, /function changePreviewZoom\(delta: number\)/);
+  assert.match(source, /aria-label="缩小图片"/);
+  assert.match(source, /aria-label="放大图片"/);
+  assert.match(source, /aria-label="重置图片大小"/);
+  assert.match(source, /style=\{\{ transform: `scale\(\$\{previewZoom\}\)` \}\}/);
+  assert.match(styles, /\.image-preview-dialog \{[^}]*width: min\(1800px, 100%\)/);
+  assert.match(styles, /\.image-preview-media \{[^}]*overflow: auto/);
+  assert.match(source, /image-preview-media\$\{previewZoom > 1/);
+  assert.match(styles, /\.image-preview-media\.is-zoomed img \{[^}]*transform-origin: top left/);
+  assert.match(source, /function handlePreviewWheel\(event: WheelEvent\)/);
+  assert.match(source, /event\.ctrlKey/);
+  assert.match(source, /event\.preventDefault\(\)/);
+  assert.match(source, /event\.stopPropagation\(\)/);
+  assert.match(source, /media\.addEventListener\("wheel", handlePreviewWheel, \{ passive: false \}\)/);
+  assert.match(source, /function handlePreviewPointerDown\(event: ReactPointerEvent<HTMLDivElement>\)/);
+  assert.match(source, /onPointerMove=\{handlePreviewPointerMove\}/);
+  assert.match(source, /onPointerUp=\{handlePreviewPointerUp\}/);
+  assert.match(source, /draggable=\{false\}/);
+  assert.match(styles, /\.image-preview-media\.is-zoomed \{[^}]*cursor: grab/);
+});
+
+test("provides a local API key configuration page without exposing the saved key", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /function openApiSettings\(\)/);
+  assert.match(source, /\/api\/settings\/api-key/);
+  assert.match(source, /type=\{apiKeyVisible \? "text" : "password"\}/);
+  assert.match(source, /autoComplete="off"/);
+  assert.match(source, /aria-label="打开 API 配置"/);
+  assert.match(source, /setApiKeyInput\(""\)/);
+  assert.match(styles, /\.api-settings-dialog \{[^}]*width: min\(540px, 100%\)/);
+  assert.match(styles, /\.api-key-input-wrap input:focus/);
+});
+
+test("gives the image preview scrollbars a dedicated dark interactive style", async () => {
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\.image-preview-media \{[\s\S]*scrollbar-gutter: stable/);
+  assert.match(styles, /\.image-preview-media \{[\s\S]*scrollbar-color: #667085 #171b24/);
+  assert.match(styles, /\.image-preview-media::-webkit-scrollbar \{ width: 10px; height: 10px; \}/);
+  assert.match(styles, /\.image-preview-media::-webkit-scrollbar-thumb:hover \{ background: #8cb0ff/);
+  assert.match(styles, /\.image-preview-media::-webkit-scrollbar-corner \{ background: #0e1117; \}/);
+});
+
 test("keeps complete thumbnails visible and frames the result image inside the canvas", async () => {
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
@@ -100,6 +150,27 @@ test("shows each gallery image prompt and supports collapsing nodes", async () =
   assert.match(styles, /\.history-prompt/);
 });
 
+test("supports collapsing gallery series groups independently from nodes", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+
+  assert.match(source, /collapsedGalleryGroups/);
+  assert.match(source, /function toggleGalleryGroup\(key: string\)/);
+  assert.match(source, /className="gallery-group-toggle"/);
+  assert.match(source, /aria-expanded=\{!groupCollapsed\}/);
+  assert.match(source, /!groupCollapsed && <div className="gallery-node-groups"/);
+  assert.match(styles, /\.gallery-group-toggle/);
+  assert.match(styles, /\.gallery-group-toggle svg\.is-collapsed/);
+});
+
+test("starts saved gallery series groups collapsed", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /const galleryCollapseInitialized = useRef\(false\)/);
+  assert.match(source, /if \(galleryCollapseInitialized\.current \|\| historyLoading \|\| !groupedHistory\.length\) return/);
+  assert.match(source, /setCollapsedGalleryGroups\(new Set\(groupedHistory\.map\(\(group\) => group\.key\)\)\)/);
+});
+
 test("connects history images to editing and delivery-version actions", async () => {
   const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
@@ -114,6 +185,13 @@ test("connects history images to editing and delivery-version actions", async ()
   assert.match(source, /设为交付版本/);
   assert.match(styles, /\.history-edit-button/);
   assert.match(styles, /\.delivery-badge/);
+});
+
+test("clears the carried prompt when canceling a continued history edit", async () => {
+  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /const cancelingHistoryEdit = referenceImages\.length === 1 && Boolean\(versionParent\)/);
+  assert.match(source, /if \(cancelingHistoryEdit\) \{[\s\S]*handlePromptChange\(""\);[\s\S]*setVersionParent\(null\);/);
 });
 
 test("provides a persistent three-theme menu for the full-width workspace", async () => {
