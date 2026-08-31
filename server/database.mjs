@@ -100,6 +100,26 @@ async function migrateDatabase(connection) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   await connection.query(`
+    CREATE TABLE IF NOT EXISTS poetry_projects (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      series_id BIGINT UNSIGNED NOT NULL,
+      title VARCHAR(120) NOT NULL,
+      poem_text TEXT NOT NULL,
+      scene_count INT UNSIGNED NOT NULL DEFAULT 6,
+      image_size VARCHAR(30) NOT NULL DEFAULT '1024x1024',
+      prompt_supplement TEXT NULL,
+      analysis_json JSON NULL,
+      style_guide TEXT NULL,
+      scenes_json JSON NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_poetry_projects_series (series_id),
+      INDEX idx_poetry_projects_updated (updated_at),
+      CONSTRAINT fk_poetry_projects_series FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
     CREATE TABLE IF NOT EXISTS image_records (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       prompt_id BIGINT UNSIGNED NULL,
@@ -160,6 +180,29 @@ async function migrateDatabase(connection) {
       CONSTRAINT fk_image_versions_record FOREIGN KEY (image_record_id) REFERENCES image_records(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+
+  const [legacyPoetrySeries] = await connection.query(`
+    SELECT s.id, s.name, s.global_prompt, s.style_prompt
+    FROM series s
+    LEFT JOIN poetry_projects p ON p.series_id = s.id
+    WHERE s.description = '诗词意境创作合集' AND p.id IS NULL
+  `);
+  for (const series of legacyPoetrySeries) {
+    const [nodes] = await connection.query("SELECT node_order, title, story_text, prompt FROM series_nodes WHERE series_id=? ORDER BY node_order", [series.id]);
+    const sourceLines = nodes.map((node) => String(node.story_text || "").trim()).filter(Boolean);
+    const poemText = [series.name, ...sourceLines].join("\n");
+    const scenes = nodes.map((node) => ({
+      sceneOrder: Number(node.node_order),
+      title: node.title,
+      sourceLine: node.story_text || "",
+      mood: "",
+      prompt: node.prompt || ""
+    }));
+    await connection.query(
+      "INSERT INTO poetry_projects (series_id, title, poem_text, scene_count, image_size, prompt_supplement, style_guide, scenes_json) VALUES (?, ?, ?, ?, '1024x1024', ?, ?, ?)",
+      [series.id, series.name, poemText, Math.min(8, Math.max(3, scenes.length || 6)), series.global_prompt || null, series.style_prompt || null, JSON.stringify(scenes)]
+    );
+  }
 }
 
 function toPrompt(row) {
@@ -439,4 +482,125 @@ export async function updateSeriesNodeStatus(nodeId, status) {
     "UPDATE series_nodes SET status=? WHERE id=?",
     [status === "completed" || status === "failed" || status === "generating" ? status : "draft", Number(nodeId)]
   );
+}
+
+function parseJsonColumn(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function toPoetryProject(row) {
+  return {
+    id: Number(row.id),
+    seriesId: Number(row.series_id),
+    title: row.title,
+    poemText: row.poem_text,
+    sceneCount: Number(row.scene_count) || 6,
+    imageSize: row.image_size || "1024x1024",
+    promptSupplement: row.prompt_supplement || "",
+    analysis: parseJsonColumn(row.analysis_json, null),
+    styleGuide: row.style_guide || "",
+    scenes: parseJsonColumn(row.scenes_json, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function normalizePoetryProject(input) {
+  const title = String(input.title || "").trim().slice(0, 120);
+  const poemText = String(input.poemText || "").trim().slice(0, 12000);
+  if (!title) throw new Error("诗词项目缺少标题。");
+  if (!poemText) throw new Error("诗词项目缺少原文。");
+  const sceneCount = Math.min(8, Math.max(3, Number(input.sceneCount) || 6));
+  const imageSize = ["1024x1024", "1536x864", "864x1536"].includes(input.imageSize) ? input.imageSize : "1024x1024";
+  const scenes = (Array.isArray(input.scenes) ? input.scenes : []).slice(0, 8).map((scene, index) => ({
+    sceneOrder: Math.max(1, Number(scene?.sceneOrder) || index + 1),
+    title: String(scene?.title || "画面 " + (index + 1)).trim().slice(0, 160),
+    sourceLine: String(scene?.sourceLine || "").trim().slice(0, 500),
+    mood: String(scene?.mood || "").trim().slice(0, 500),
+    prompt: String(scene?.prompt || "").trim().slice(0, 12000)
+  }));
+  return {
+    title,
+    poemText,
+    sceneCount,
+    imageSize,
+    promptSupplement: String(input.promptSupplement || "").trim().slice(0, 4000),
+    analysis: input.analysis && typeof input.analysis === "object" && !Array.isArray(input.analysis) ? input.analysis : null,
+    styleGuide: String(input.styleGuide || "").trim().slice(0, 4000),
+    scenes
+  };
+}
+
+async function readPoetryProject(database, id) {
+  const [rows] = await database.query("SELECT * FROM poetry_projects WHERE id=?", [id]);
+  return rows[0] ? toPoetryProject(rows[0]) : null;
+}
+
+export async function listPoetryProjects() {
+  const database = await getDatabase();
+  if (!database) return [];
+  const [rows] = await database.query("SELECT * FROM poetry_projects ORDER BY updated_at DESC, id DESC");
+  return rows.map(toPoetryProject);
+}
+
+export async function getPoetryProject(id) {
+  const database = await getDatabase();
+  if (!database || !Number.isInteger(Number(id))) return null;
+  return readPoetryProject(database, Number(id));
+}
+
+export async function upsertPoetryProject(input, id = null) {
+  const database = await getDatabase();
+  if (!database) throw new Error("未配置 MySQL，无法保存诗词项目。");
+  const project = normalizePoetryProject(input);
+  const connection = await database.getConnection();
+  try {
+    await connection.beginTransaction();
+    let projectId = Number.isInteger(Number(id)) ? Number(id) : null;
+    let seriesId;
+    if (projectId) {
+      const [existing] = await connection.query("SELECT series_id FROM poetry_projects WHERE id=? FOR UPDATE", [projectId]);
+      if (!existing[0]) throw new Error("诗词项目不存在。");
+      seriesId = Number(existing[0].series_id);
+      await connection.query(
+        "UPDATE poetry_projects SET title=?, poem_text=?, scene_count=?, image_size=?, prompt_supplement=?, analysis_json=?, style_guide=?, scenes_json=? WHERE id=?",
+        [project.title, project.poemText, project.sceneCount, project.imageSize, project.promptSupplement || null, project.analysis ? JSON.stringify(project.analysis) : null, project.styleGuide || null, JSON.stringify(project.scenes), projectId]
+      );
+      await connection.query(
+        "UPDATE series SET name=?, description='诗词意境创作合集', global_prompt=?, style_prompt=? WHERE id=?",
+        [project.title, project.promptSupplement || null, project.styleGuide || null, seriesId]
+      );
+    } else {
+      const [seriesResult] = await connection.query(
+        "INSERT INTO series (name, description, global_prompt, style_prompt) VALUES (?, '诗词意境创作合集', ?, ?)",
+        [project.title, project.promptSupplement || null, project.styleGuide || null]
+      );
+      seriesId = Number(seriesResult.insertId);
+      const [projectResult] = await connection.query(
+        "INSERT INTO poetry_projects (series_id, title, poem_text, scene_count, image_size, prompt_supplement, analysis_json, style_guide, scenes_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [seriesId, project.title, project.poemText, project.sceneCount, project.imageSize, project.promptSupplement || null, project.analysis ? JSON.stringify(project.analysis) : null, project.styleGuide || null, JSON.stringify(project.scenes)]
+      );
+      projectId = Number(projectResult.insertId);
+    }
+
+    for (const scene of project.scenes) {
+      await connection.query(
+        "INSERT INTO series_nodes (series_id, node_order, title, story_text, prompt) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), story_text=VALUES(story_text), prompt=VALUES(prompt)",
+        [seriesId, scene.sceneOrder, scene.title, scene.sourceLine || null, scene.prompt || null]
+      );
+    }
+    await connection.commit();
+    return readPoetryProject(database, projectId);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }

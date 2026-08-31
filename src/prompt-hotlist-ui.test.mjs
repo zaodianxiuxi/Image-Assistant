@@ -90,7 +90,9 @@ test("provides a local API key configuration page without exposing the saved key
   assert.match(source, /autoComplete="off"/);
   assert.match(source, /aria-label="打开 API 配置"/);
   assert.match(source, /setApiKeyInput\(""\)/);
-  assert.match(styles, /\.api-settings-dialog \{[^}]*width: min\(540px, 100%\)/);
+  assert.match(styles, /\.api-settings-backdrop \{[^}]*place-items: stretch end/);
+  assert.match(styles, /\.api-settings-dialog \{[^}]*width: 70vw; height: 100dvh/);
+  assert.match(styles, /@keyframes api-settings-drawer-in/);
   assert.match(styles, /\.api-key-input-wrap input:focus/);
 });
 
@@ -271,7 +273,7 @@ test("presents the style extraction workbench as a larger right-side drawer", as
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
   assert.match(styles, /\.style-workbench-backdrop \{[^}]*place-items: stretch end/);
-  assert.match(styles, /\.style-workbench \{[^}]*width: 75vw/);
+  assert.match(styles, /\.style-workbench \{[^}]*width: 70vw/);
   assert.doesNotMatch(styles, /\.style-workbench \{[^}]*1080px/);
   assert.match(styles, /\.style-workbench \{[^}]*height: 100%/);
   assert.match(styles, /\.style-workbench \{[^}]*border-radius: 14px 0 0 14px/);
@@ -319,24 +321,23 @@ test("keeps extension labels hidden until a tool is hovered or focused", async (
   assert.match(styles, /transform: scale\(1\.06\)/);
 });
 
-test("presents the prompt library and series manager as top drawers", async () => {
+test("presents the prompt library and series manager as right-side drawers", async () => {
   const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
-  assert.match(styles, /\.manager-backdrop \{[^}]*place-items: start center[^}]*padding: 0/);
-  assert.match(styles, /\.manager-backdrop \{[^}]*left: calc\(clamp\(14px, 1\.8vw, 28px\) \+ 360px \+ clamp\(8px, 1vw, 14px\)\)/);
-  assert.match(styles, /\.manager-dialog \{[^}]*width: 100%; height: 50dvh/);
-  assert.match(styles, /\.manager-dialog \{[^}]*max-height: 50dvh/);
-  assert.match(styles, /\.manager-dialog \{[^}]*border-radius: 0 0 12px 12px/);
+  assert.match(styles, /\.manager-backdrop \{[^}]*place-items: stretch end[^}]*padding: 0/);
+  assert.match(styles, /\.manager-dialog \{[^}]*width: 70vw; height: 100dvh/);
+  assert.match(styles, /\.manager-dialog \{[^}]*max-height: none/);
+  assert.match(styles, /\.manager-dialog \{[^}]*border-radius: 12px 0 0 12px/);
   assert.match(styles, /@keyframes manager-drawer-in/);
   assert.match(styles, /\.manager-dialog \{[^}]*animation: manager-drawer-in \.32s ease-out/);
   assert.match(styles, /\.manager-dialog \{[^}]*will-change: transform/);
-  assert.match(styles, /from \{ opacity: \.72; transform: translateY\(-100%\)/);
+  assert.match(styles, /from \{ opacity: \.72; transform: translateX\(100%\)/);
   assert.match(source, /managerClosing/);
   assert.match(source, /managerClosing === "library" \? " closing" : ""/);
   assert.match(source, /managerClosing === "series" \? " closing" : ""/);
   assert.match(styles, /\.manager-backdrop\.closing \.manager-dialog/);
   assert.match(styles, /@keyframes manager-drawer-out/);
   assert.match(styles, /animation: manager-drawer-out \.28s ease-in/);
-  assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.manager-backdrop \{[^}]*place-items: start center/);
+  assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.manager-backdrop \{[^}]*place-items: stretch/);
 });

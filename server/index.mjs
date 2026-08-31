@@ -9,6 +9,7 @@ import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-ima
 import { readPromptCache, validatePromptCandidates, writePromptCache } from "./prompt-cache.mjs";
 import { generatePromptCandidates } from "./prompt-generator.mjs";
 import { generateStoryboard } from "./storyboard-generator.mjs";
+import { analyzePoetry, generatePoetryScenes } from "./poetry-generator.mjs";
 import { analyzeImageStyle } from "./style-analyzer.mjs";
 import { composeStylePrompt } from "./style-composer.mjs";
 import {
@@ -25,8 +26,10 @@ import {
   createSeriesNode,
   createStoryboardNodes,
   deletePrompt,
+  getPoetryProject,
   isDatabaseConfigured,
   listPrompts,
+  listPoetryProjects,
   listGeneratedImages,
   listSeries,
   listSeriesNodes,
@@ -34,6 +37,7 @@ import {
   saveGeneratedImage,
   saveImageVersion,
   updateSeriesNodeStatus,
+  upsertPoetryProject,
   upsertPrompt
 } from "./database.mjs";
 
@@ -371,6 +375,98 @@ app.post("/api/series/:id/storyboard", async (req, res) => {
     res.status(201).json({ nodes: savedNodes });
   } catch (error) {
     sendError(req, res, 502, error instanceof Error ? error.message : "自动拆分故事失败。", { operation: "storyboard", ...errorDetails(error) });
+  }
+});
+
+app.get("/api/poetry/projects", async (req, res) => {
+  try {
+    res.json({ projects: await listPoetryProjects(), databaseConfigured: isDatabaseConfigured() });
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "读取诗词项目失败。", { operation: "poetry_project", ...errorDetails(error) });
+  }
+});
+
+app.get("/api/poetry/projects/:id", async (req, res) => {
+  try {
+    const project = await getPoetryProject(Number(req.params.id));
+    if (!project) {
+      sendError(req, res, 404, "诗词项目不存在。", { operation: "poetry_project" });
+      return;
+    }
+    res.json({ project });
+  } catch (error) {
+    sendError(req, res, 503, error instanceof Error ? error.message : "读取诗词项目失败。", { operation: "poetry_project", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/poetry/projects", async (req, res) => {
+  try {
+    const project = await upsertPoetryProject(req.body || {});
+    res.status(201).json({ project });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "保存诗词项目失败。", { operation: "poetry_project", ...errorDetails(error) });
+  }
+});
+
+app.patch("/api/poetry/projects/:id", async (req, res) => {
+  try {
+    const project = await upsertPoetryProject(req.body || {}, Number(req.params.id));
+    res.json({ project });
+  } catch (error) {
+    const status = error instanceof Error && error.message === "诗词项目不存在。" ? 404 : 400;
+    sendError(req, res, status, error instanceof Error ? error.message : "更新诗词项目失败。", { operation: "poetry_project", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/poetry/analyze", async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  if (!process.env.SUDOCODE_TEXT_MODEL) {
+    sendError(req, res, 503, "未配置 SUDOCODE_TEXT_MODEL，无法解析诗词意境。", { operation: "poetry_analyze" });
+    return;
+  }
+  if (typeof req.body?.poem !== "string" || !req.body.poem.trim()) {
+    sendError(req, res, 400, "请输入诗词原文。", { operation: "poetry_analyze" });
+    return;
+  }
+  try {
+    const analysis = await analyzePoetry({
+      apiBase,
+      apiKey: process.env.SUDOCODE_API_KEY,
+      model: process.env.SUDOCODE_TEXT_MODEL,
+      poem: req.body.poem
+    });
+    res.json({ analysis });
+  } catch (error) {
+    sendError(req, res, 502, error instanceof Error ? error.message : "诗词意境解析失败。", { operation: "poetry_analyze", ...errorDetails(error) });
+  }
+});
+
+app.post("/api/poetry/interpret", async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  if (!process.env.SUDOCODE_TEXT_MODEL) {
+    sendError(req, res, 503, "未配置 SUDOCODE_TEXT_MODEL，无法解析诗词意境。", { operation: "poetry_interpret" });
+    return;
+  }
+  if (typeof req.body?.poem !== "string" || !req.body.poem.trim()) {
+    sendError(req, res, 400, "请输入诗词原文。", { operation: "poetry_interpret" });
+    return;
+  }
+  if (!req.body?.analysis || typeof req.body.analysis !== "object" || Array.isArray(req.body.analysis)) {
+    sendError(req, res, 400, "请先完成并确认诗词意境分析。", { operation: "poetry_interpret" });
+    return;
+  }
+  try {
+    const result = await generatePoetryScenes({
+      apiBase,
+      apiKey: process.env.SUDOCODE_API_KEY,
+      model: process.env.SUDOCODE_TEXT_MODEL,
+      poem: req.body?.poem,
+      analysis: req.body?.analysis,
+      sceneCount: req.body?.sceneCount
+    });
+    res.json(result);
+  } catch (error) {
+    sendError(req, res, 502, error instanceof Error ? error.message : "诗词意境解析失败。", { operation: "poetry_interpret", ...errorDetails(error) });
   }
 });
 

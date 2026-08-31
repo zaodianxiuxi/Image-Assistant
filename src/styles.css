@@ -416,7 +416,7 @@ body { font-size: 14px; line-height: 1.55; }
 
 /* Use the style extractor as a spacious right-side drawer on desktop. */
 .style-workbench-backdrop { place-items: stretch end; padding: 0; }
-.style-workbench { width: 75vw; height: 100%; max-height: none; border-radius: 14px 0 0 14px; animation: style-drawer-in .24s ease-out; }
+.style-workbench { width: 70vw; height: 100%; max-height: none; border-radius: 14px 0 0 14px; animation: style-drawer-in .24s ease-out; }
 .style-workbench-body { grid-template-columns: 300px minmax(0, 1fr); }
 
 @keyframes style-drawer-in {
@@ -430,24 +430,24 @@ body { font-size: 14px; line-height: 1.55; }
   .style-workbench-body { grid-template-columns: 1fr; }
 }
 
-/* Prompt library and series manager share a top drawer instead of a centered modal. */
-.manager-backdrop { left: calc(clamp(14px, 1.8vw, 28px) + 360px + clamp(8px, 1vw, 14px)); right: 0; place-items: start center; padding: 0; background: color-mix(in srgb, var(--text-strong), transparent 38%); }
-.manager-dialog { width: 100%; height: 50dvh; max-height: 50dvh; border-radius: 0 0 12px 12px; animation: manager-drawer-in .32s ease-out; will-change: transform; }
+/* Prompt library and series manager share the same right-side drawer pattern. */
+.manager-backdrop { place-items: stretch end; padding: 0; background: color-mix(in srgb, var(--text-strong), transparent 38%); }
+.manager-dialog { width: 70vw; height: 100dvh; max-height: none; border-radius: 12px 0 0 12px; animation: manager-drawer-in .32s ease-out; will-change: transform; }
 .manager-backdrop.closing .manager-dialog { animation: manager-drawer-out .28s ease-in forwards; }
 
 @keyframes manager-drawer-in {
-  from { opacity: .72; transform: translateY(-100%); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: .72; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes manager-drawer-out {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-100%); }
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
 }
 
 @media (max-width: 600px) {
-  .manager-backdrop { left: 0; place-items: start center; padding: 0; }
-  .manager-dialog { width: 100%; height: 50dvh; max-height: 50dvh; border-radius: 0 0 10px 10px; }
+  .manager-backdrop { place-items: stretch; }
+  .manager-dialog { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
 }
 
 .image-preview-media.is-zoomed { cursor: grab; user-select: none; }
@@ -456,13 +456,13 @@ body { font-size: 14px; line-height: 1.55; }
 
 .setup-link { padding: 0; border: 0; color: var(--accent); background: transparent; font-size: inherit; font-weight: 800; }
 .setup-link:hover { color: color-mix(in srgb, var(--accent), var(--text-strong) 22%); }
-.api-settings-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; padding: 24px; place-items: center; background: color-mix(in srgb, var(--text-strong), transparent 42%); }
-.api-settings-dialog { width: min(540px, 100%); overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--surface-panel); box-shadow: 0 24px 60px color-mix(in srgb, var(--text-strong), transparent 68%); animation: preview-rise .2s ease-out; }
+.api-settings-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; padding: 0; place-items: stretch end; background: color-mix(in srgb, var(--text-strong), transparent 42%); }
+.api-settings-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); width: 70vw; height: 100dvh; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 12px 0 0 12px; background: var(--surface-panel); box-shadow: 0 24px 60px color-mix(in srgb, var(--text-strong), transparent 68%); animation: api-settings-drawer-in .24s ease-out; }
 .api-settings-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 60px; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--border-subtle); }
 .api-settings-toolbar > div { display: grid; gap: 2px; min-width: 0; }
 .api-settings-toolbar strong { font-size: 15px; }
 .api-settings-toolbar span { color: var(--text-muted); font-size: 11px; }
-.api-settings-form { display: grid; gap: 12px; padding: 20px; }
+.api-settings-form { display: grid; align-content: start; gap: 12px; padding: 20px; }
 .api-settings-form > label { color: var(--text-strong); font-size: 12px; font-weight: 800; }
 .api-key-input-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 7px; }
 .api-key-input-wrap input { min-width: 0; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: 6px; outline: 0; color: var(--text-strong); background: var(--surface-subtle); font: 12px "DM Mono", monospace; }
@@ -477,6 +477,138 @@ body { font-size: 14px; line-height: 1.55; }
   .topbar-actions { gap: 8px; }
   .topbar-actions .connection { display: none; }
   .brand > span:last-child { display: none; }
-  .api-settings-backdrop { padding: 14px; }
+  .api-settings-backdrop { place-items: stretch; }
+  .api-settings-dialog { width: 100%; height: 100dvh; border-radius: 0; }
   .api-settings-form { padding: 16px; }
+}
+
+@keyframes api-settings-drawer-in {
+  from { opacity: .72; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Poetry interpretation uses a wider right-side drawer for side-by-side scene editing. */
+.poetry-backdrop { position: fixed; z-index: 35; inset: 0; display: grid; place-items: stretch end; padding: 0; background: color-mix(in srgb, var(--text-strong), transparent 38%); }
+.poetry-dialog { width: 70vw; height: 100dvh; max-height: none; margin: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 12px 0 0 12px; background: var(--surface-panel); box-shadow: 0 24px 70px color-mix(in srgb, var(--text-strong), transparent 68%); animation: poetry-drawer-in .24s ease-out; }
+.poetry-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 68px; padding: 12px 16px 12px 20px; border-bottom: 1px solid var(--border-subtle); }
+.poetry-toolbar > div { display: grid; gap: 3px; min-width: 0; }
+.poetry-toolbar strong { color: var(--text-strong); font-size: 16px; }
+.poetry-toolbar small { color: var(--text-muted); font-size: 11px; }
+.poetry-body { display: grid; align-content: start; gap: 14px; height: calc(100% - 68px); overflow: auto; padding: 18px 20px 24px; }
+.poetry-projects { display: grid; gap: 8px; padding-bottom: 13px; border-bottom: 1px solid var(--border-subtle); }
+.poetry-projects-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.poetry-projects-heading > div { display: grid; gap: 2px; }
+.poetry-projects-heading strong { color: var(--text-strong); font-size: 12px; }
+.poetry-projects-heading small, .poetry-project-status { color: var(--text-muted); font-size: 9px; }
+.poetry-projects-heading button { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-strong); background: var(--surface-panel); font-size: 10px; font-weight: 800; }
+.poetry-projects-heading button:hover { border-color: var(--accent); color: var(--accent); }
+.poetry-project-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.poetry-project-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 8px 9px; border: 1px solid var(--border-subtle); border-radius: 5px; color: var(--text-strong); background: var(--surface-subtle); text-align: left; }
+.poetry-project-item > span { display: grid; gap: 3px; min-width: 0; }
+.poetry-project-item strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.poetry-project-item small { color: var(--text-muted); font-size: 9px; }
+.poetry-project-item svg { flex: none; color: var(--text-muted); transform: rotate(-90deg); }
+.poetry-project-item:hover, .poetry-project-item.active { border-color: var(--accent); background: var(--accent-soft); }
+.poetry-project-status { margin: 0; min-height: 13px; }
+.poetry-input-section { display: grid; gap: 8px; }
+.poetry-input-section > label { color: var(--text-strong); font-size: 12px; font-weight: 800; }
+.poetry-collection-note { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--accent); font-size: 11px; font-weight: 800; }
+.poetry-input-section textarea, .poetry-scene textarea { width: 100%; min-width: 0; resize: vertical; border: 1px solid var(--border-subtle); border-radius: 6px; outline: 0; color: var(--text-strong); background: var(--surface-subtle); font-size: 12px; line-height: 1.65; }
+.poetry-input-section textarea { min-height: 112px; padding: 10px 11px; }
+.poetry-input-section textarea:focus, .poetry-scene textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent), transparent 84%); }
+.poetry-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.poetry-actions > label { color: var(--text-muted); font-size: 11px; font-weight: 700; }
+.poetry-actions select { min-height: 34px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: 5px; color: var(--text-strong); background: var(--surface-panel); font-size: 11px; }
+.poetry-actions button, .poetry-scene-heading button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; padding: 0 11px; border: 1px solid var(--border-subtle); border-radius: 5px; color: var(--text-strong); background: var(--surface-panel); font-size: 11px; font-weight: 800; }
+.poetry-actions button:hover:not(:disabled), .poetry-scene-heading button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.poetry-actions button.primary { border-color: var(--accent); color: #fff; background: var(--accent); }
+.poetry-actions button:disabled, .poetry-scene-heading button:disabled { opacity: .5; cursor: not-allowed; }
+.poetry-workflow { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.poetry-workflow-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.poetry-workflow-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; padding: 2px 12px; border-right: 1px solid var(--border-subtle); }
+.poetry-workflow-step:first-child { padding-left: 0; }
+.poetry-workflow-step:last-child { padding-right: 0; border-right: 0; }
+.poetry-workflow-indicator { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--border-subtle); border-radius: 50%; color: var(--text-muted); background: var(--surface-panel); font: 10px "DM Mono", monospace; }
+.poetry-workflow-step > div { display: grid; gap: 2px; min-width: 0; }
+.poetry-workflow-step strong { color: var(--text-strong); font-size: 11px; }
+.poetry-workflow-step small { overflow: hidden; color: var(--text-muted); font-size: 9px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.poetry-workflow-step.active .poetry-workflow-indicator { border-color: var(--accent); color: #fff; background: var(--accent); }
+.poetry-workflow-step.active strong { color: var(--accent); }
+.poetry-workflow-step.done .poetry-workflow-indicator { border-color: color-mix(in srgb, var(--success), transparent 30%); color: var(--success); background: color-mix(in srgb, var(--success), transparent 90%); }
+.poetry-workflow-step.error .poetry-workflow-indicator { border-color: color-mix(in srgb, var(--danger), transparent 30%); color: var(--danger); background: color-mix(in srgb, var(--danger), transparent 90%); }
+.poetry-image-progress { display: grid; gap: 5px; }
+.poetry-image-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text-muted); font-size: 9px; }
+.poetry-image-progress-heading strong { color: var(--text-strong); font: 10px "DM Mono", monospace; }
+.poetry-image-progress-track { height: 5px; overflow: hidden; border-radius: 3px; background: var(--surface-subtle); }
+.poetry-image-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .28s ease; }
+.poetry-workflow-message { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.poetry-workflow-message p, .poetry-workflow-message small { margin: 0; font-size: 10px; line-height: 1.5; }
+.poetry-workflow-message p { color: var(--accent); font-weight: 700; }
+.poetry-workflow-message small { color: var(--text-muted); text-align: right; }
+.poetry-analysis { display: grid; gap: 14px; padding: 16px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.poetry-analysis-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.poetry-analysis-heading > div { display: grid; gap: 3px; }
+.poetry-analysis-heading strong { color: var(--text-strong); font-size: 14px; }
+.poetry-analysis-heading small, .poetry-analysis-heading > span { color: var(--text-muted); font-size: 10px; }
+.poetry-analysis-heading > span { flex: none; padding: 4px 7px; border: 1px solid var(--border-subtle); border-radius: 4px; }
+.poetry-analysis-meta { display: grid; grid-template-columns: 1.4fr 1fr .7fr; gap: 10px; }
+.poetry-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.poetry-analysis-field.wide { grid-column: 1 / -1; }
+.poetry-analysis label, .poetry-line-readings > strong, .poetry-analysis-notes > strong { display: grid; gap: 5px; color: var(--text-muted); font-size: 10px; font-weight: 800; }
+.poetry-analysis input, .poetry-analysis textarea, .poetry-analysis select { width: 100%; min-width: 0; border: 1px solid var(--border-subtle); border-radius: 5px; outline: 0; color: var(--text-strong); background: var(--surface-subtle); font: inherit; font-weight: 500; line-height: 1.55; }
+.poetry-analysis input, .poetry-analysis select { min-height: 34px; padding: 0 9px; }
+.poetry-analysis textarea { resize: vertical; padding: 8px 9px; }
+.poetry-analysis input:focus, .poetry-analysis textarea:focus, .poetry-analysis select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent), transparent 84%); }
+.poetry-line-readings, .poetry-analysis-notes { display: grid; gap: 9px; }
+.poetry-line-reading { display: grid; grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.poetry-line-reading > span { grid-row: 1 / 3; padding-top: 23px; color: var(--accent); font: 10px "DM Mono", monospace; }
+.poetry-line-reading > label:first-of-type { grid-column: 2 / -1; }
+.poetry-allusion { display: grid; grid-template-columns: minmax(110px, .6fr) minmax(0, 2fr) 90px; gap: 8px; align-items: start; }
+.poetry-allusion select { background: var(--surface-panel); }
+.poetry-analysis-notes > label { padding-top: 2px; }
+.poetry-style-guide { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); color: var(--text-muted); background: var(--accent-soft); font-size: 11px; line-height: 1.6; }
+.poetry-style-guide strong { color: var(--text-strong); }
+.poetry-scene-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.poetry-scene { display: grid; min-width: 0; align-content: start; gap: 7px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-panel); }
+.poetry-scene.generation-running { border-color: color-mix(in srgb, var(--accent), transparent 35%); }
+.poetry-scene.generation-success { border-color: color-mix(in srgb, var(--success), transparent 50%); }
+.poetry-scene.generation-error { border-color: color-mix(in srgb, var(--danger), transparent 35%); }
+.poetry-scene-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.poetry-scene-heading > span { color: var(--accent); font: 11px "DM Mono", monospace; }
+.poetry-scene-heading strong { flex: 1; min-width: 0; overflow: hidden; color: var(--text-strong); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.poetry-scene-heading button { width: 30px; min-height: 30px; padding: 0; }
+.poetry-source, .poetry-mood { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+.poetry-source { color: var(--text-strong); font-weight: 700; }
+.poetry-scene textarea { min-height: 112px; padding: 8px 9px; font-size: 11px; }
+.poetry-scene-generation-status { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 28px; padding-top: 7px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 9px; line-height: 1.45; }
+.poetry-scene-generation-status.running { color: var(--accent); }
+.poetry-scene-generation-status.success { color: var(--success); }
+.poetry-scene-generation-status.error { color: var(--danger); }
+.poetry-scene-generation-status button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 26px; padding: 0 8px; border: 1px solid color-mix(in srgb, var(--danger), transparent 45%); border-radius: 4px; color: var(--danger); background: transparent; font-size: 9px; font-weight: 800; }
+.poetry-scene-generation-status button:hover:not(:disabled) { color: #fff; background: var(--danger); }
+.poetry-scene-generation-status button:disabled { opacity: .5; cursor: not-allowed; }
+.poetry-empty, .poetry-status, .poetry-progress { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.poetry-status { color: var(--accent); }
+.poetry-progress { padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+@keyframes poetry-drawer-in { from { opacity: .7; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+
+@media (max-width: 700px) {
+  .poetry-backdrop { place-items: stretch; }
+  .poetry-dialog { width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .poetry-body { height: calc(100% - 68px); padding: 16px 14px 22px; }
+  .poetry-project-list { grid-template-columns: 1fr; }
+  .poetry-workflow-steps { grid-template-columns: 1fr; gap: 9px; }
+  .poetry-workflow-step, .poetry-workflow-step:first-child, .poetry-workflow-step:last-child { padding: 0; border-right: 0; }
+  .poetry-workflow-step small { white-space: normal; }
+  .poetry-workflow-message { display: grid; gap: 3px; }
+  .poetry-workflow-message small { text-align: left; }
+  .poetry-analysis-heading { align-items: flex-start; }
+  .poetry-analysis-meta, .poetry-analysis-grid { grid-template-columns: 1fr; }
+  .poetry-analysis-field.wide { grid-column: auto; }
+  .poetry-line-reading { grid-template-columns: 24px 1fr; }
+  .poetry-line-reading > span { grid-row: 1 / 5; }
+  .poetry-line-reading > label, .poetry-line-reading > label:first-of-type { grid-column: 2; }
+  .poetry-allusion { grid-template-columns: 1fr; }
+  .poetry-scene-list { grid-template-columns: 1fr; }
+  .poetry-actions button.primary { flex: 1; }
 }

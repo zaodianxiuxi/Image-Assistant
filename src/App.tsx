@@ -2,8 +2,10 @@ import { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, SyntheticEve
 import {
   ArrowDownToLine,
   ArrowUpRight,
+  BookOpen,
   CheckCircle2,
   ChevronDown,
+  CircleAlert,
   Clock3,
   Download,
   Eraser,
@@ -32,10 +34,14 @@ import { getDailyPromptHotlist } from "./prompt-hotlist.mjs";
 import type { PromptHotlistItem } from "./prompt-hotlist.mjs";
 import { groupHistoryRecords } from "./gallery-groups.mjs";
 import { enrichSessionVersion, markSessionDelivery } from "./image-version-session.mjs";
+import { ImageRequestError, retryPoetryImageRequest } from "./poetry-image-retry.mjs";
 import StyleWorkbench from "./StyleWorkbench";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
+type PoetryWorkflowStage = "analysis" | "storyboard" | "images";
+type PoetryImageProgress = { status: "idle" | "running" | "done" | "error"; completed: number; total: number; currentTitle: string };
+type PoetrySceneGenerationState = { status: "waiting" | "running" | "success" | "error"; message: string; attempt: number };
 type Theme = "light" | "dark" | "studio";
 type ManagerPanel = "library" | "series";
 type ReferenceImage = {
@@ -70,6 +76,37 @@ type LibraryPrompt = {
 };
 type SeriesRecord = { id: number; name: string; description?: string; global_prompt?: string; style_prompt?: string };
 type SeriesNode = { id: number; series_id: number; node_order: number; title: string; story_text?: string; prompt?: string; status: string };
+type PoetryScene = { sceneOrder: number; title: string; sourceLine: string; mood: string; prompt: string };
+type PoetryLineReading = { sourceLine: string; meaning: string; emotion: string; visualFocus: string };
+type PoetryAllusion = { sourceText: string; explanation: string; confidence: "high" | "medium" | "low" };
+type PoetryAnalysis = {
+  title: string;
+  author: string;
+  dynasty: string;
+  theme: string;
+  overview: string;
+  timeAndPlace: string;
+  emotionalArc: string;
+  coreImagery: string[];
+  lineReadings: PoetryLineReading[];
+  allusions: PoetryAllusion[];
+  uncertainties: string[];
+};
+type PoetryProject = {
+  id: number;
+  seriesId: number;
+  title: string;
+  poemText: string;
+  sceneCount: number;
+  imageSize: string;
+  promptSupplement: string;
+  analysis: PoetryAnalysis | null;
+  styleGuide: string;
+  scenes: PoetryScene[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+type PoetryCollection = { name: string; series: SeriesRecord; nodesByOrder: Map<number, SeriesNode> };
 
 const SIZES = [
   { value: "1024x1024", name: "正方形", detail: "1:1" },
@@ -79,6 +116,35 @@ const SIZES = [
 
 const MAX_REFERENCE_IMAGES = 10;
 const STORYBOARD_STYLE_PREFIX = "写实、现实质感的东方志怪电影摄影风格，古代中国环境，可信的人物比例和材质，统一角色外貌、服装、时代与光影，不要卡通、插画或现代物品。";
+const DEFAULT_POETRY_STYLE_GUIDE = "整体采用唐代长安旧都的历史氛围，统一为黄昏到入夜前的冷暖交替色调，人物为同一位中年文士，青色圆领长袍、黑色幞头、浅灰旧氅衣，始终以电影感写实水墨风呈现，强调高城、渭水、荒苑、秋叶、风雨与远眺的连续空间关系。";
+const DEFAULT_POETRY_ANALYSIS: PoetryAnalysis = {
+  title: "咸阳城东楼",
+  author: "许浑",
+  dynasty: "唐",
+  theme: "登临怀古，在风雨将至的自然景象中感叹故国兴亡与身世漂泊。",
+  overview: "诗人登上咸阳城东楼远眺，从蒹葭杨柳、溪云落日写到满楼风雨，再由秦苑、汉宫的荒凉秋景转入怀古。全诗把眼前天气变化、旧都遗迹与个人愁绪合为一体，最后以东流渭水收束，历史盛衰终归无言。",
+  timeAndPlace: "深秋黄昏，咸阳城东楼及城外渭水、秦苑与汉宫旧址；视线由高楼远眺逐渐移向荒苑和东流水。",
+  emotionalArc: "登高即生万里愁，继而因暮云、落日和骤风感到压迫不安；看到秦汉故苑的鸟、蝉与黄叶后转为历史苍凉，最终沉入不问往事的克制与无奈。",
+  coreImagery: ["高城", "蒹葭", "杨柳", "溪云", "落日", "满楼风", "秦苑", "黄叶", "汉宫", "渭水"],
+  lineReadings: [
+    { sourceLine: "一上高城万里愁，蒹葭杨柳似汀洲", meaning: "诗人一登高楼便愁绪满怀，城外芦苇杨柳连着水岸，恍如遥远的江南汀洲。", emotion: "登临触景，乡愁与漂泊感骤然涌起。", visualFocus: "高楼上的独行文士、远处芦苇杨柳与水岸。" },
+    { sourceLine: "溪云初起日沉阁，山雨欲来风满楼", meaning: "溪谷云气刚刚升起，落日沉到楼阁之后；山雨尚未落下，急风已经灌满整座城楼。", emotion: "暮色迅速转沉，压迫感与风雨将至的不安加深。", visualFocus: "云气、沉日、楼阁剪影、翻动的帘幕和人物衣袍。" },
+    { sourceLine: "鸟下绿芜秦苑夕，蝉鸣黄叶汉宫秋", meaning: "黄昏飞鸟落入秦苑荒草，秋蝉在汉宫旧址的黄叶间鸣叫，昔日繁华只余寂寥。", emotion: "由眼前秋景转入怀古，感叹王朝遗迹的衰败。", visualFocus: "荒苑、归鸟、残墙、黄叶与暮色中的旧宫轮廓。" },
+    { sourceLine: "行人莫问当年事，故国东来渭水流", meaning: "过客不必追问旧朝往事，只有渭水从故国旁向东流去，一如从不停驻的时间。", emotion: "怀古之愁归于沉默、克制与无可挽回。", visualFocus: "水边行人、旧都废墟与延伸至远方的渭水。" }
+  ],
+  allusions: [
+    { sourceText: "秦苑、汉宫", explanation: "以秦汉宫苑旧迹并举，借昔日帝都与眼前荒凉形成盛衰对照。", confidence: "high" }
+  ],
+  uncertainties: ["“似汀洲”是否明确指向诗人的江南乡愁，历来可有不同解释；画面可保留水岸联想，不必指定确切故乡。"]
+};
+const DEFAULT_POETRY_SCENES: PoetryScene[] = [
+  { sceneOrder: 1, title: "登城远愁", sourceLine: "一上高城万里愁", mood: "初登城楼，胸中先起的是辽阔而无法排遣的乡国之愁。", prompt: "唐代长安咸阳城东高城之上，一位中年文士刚登上城楼，身着青色圆领长袍、黑色幞头、浅灰旧氅衣，手扶木栏凭高远望，面容清瘦、眉宇紧锁。城楼砖石斑驳，檐角沉重，远处城郭层叠、道路细若游丝。暮色初临，天光尚未尽暗，风从高处掠过衣袖与衣带，空气里带着秋凉。镜头从背后中景推进到半身近景，突出人物孤身与辽阔空间的对比，色彩以灰蓝、土黄、暗青为主，渲染初上高楼便生出的万里愁思。" },
+  { sceneOrder: 2, title: "汀洲蒹葭", sourceLine: "蒹葭杨柳似汀洲", mood: "眼前荒城外的芦苇杨柳，把人引向遥远水边的漂泊联想。", prompt: "城东楼外视野展开，低处是一片临水湿地，蒹葭成丛、杨柳低垂，秋风吹动芦穗与柳丝，远看如江汀洲渚。前景仍可见文士倚栏的侧影，目光越过城墙望向城外河岸。地面有浅浅水洼，倒映残霞与草木，层次由近处城楼砖石过渡到中景芦苇，再到远处平静水面和模糊天际。夕阳余晖压低，光线柔和而偏冷，画面静中含远，借芦苇与杨柳写出漂泊、故土与水岸记忆交织的情绪。" },
+  { sceneOrder: 3, title: "云起日沉", sourceLine: "溪云初起日沉阁", mood: "云气升起、落日西沉，时间在迅速滑向更深的暮色。", prompt: "城楼侧面与远处溪谷同框，天边一轮夕日正缓缓沉入城阁后方，溪上薄云初起，沿着低处水道向城下漫开。文士仍立在楼上，半侧身回望天际，衣袍被风掀起一角。画面上方是被云层切开的残红与灰紫天空，中间是高阁剪影，下面是蜿蜒溪流、石岸与稀疏枯草，空间层次分明。镜头采用略仰拍广角，突出日沉阁后的压迫感与时光流逝感，光线由金红转为暗橙再到青灰，空气里有秋日将尽的凉意。" },
+  { sceneOrder: 4, title: "山雨满楼", sourceLine: "山雨欲来风满楼", mood: "风势骤紧，暴雨未落而压抑已至，天地间充满不安的预兆。", prompt: "咸阳城东楼内部与檐外交错呈现，风猛烈灌入楼中，帘幕翻卷，木窗轻颤，桌上竹简与袖口被吹得微动。文士立于楼内近窗处，神情凝重，抬眼望向远处山色，天际乌云翻滚，山脊被阴影压低，雨脚尚未落下，却已让空气潮重。外景可见城外山峦暗沉、林木摇摆、飞尘与落叶卷起，楼檐下水气弥漫。镜头以室内中景带出外景广域，强调风从四面涌来的包围感，色调转为墨绿、深灰、铁青，营造山雨欲来的紧迫与时代风声。" },
+  { sceneOrder: 5, title: "秦苑夕鸟", sourceLine: "鸟下绿芜秦苑夕", mood: "荒苑暮色中，飞鸟归下，昔日繁华只剩衰草与空旷。", prompt: "镜头转向城外旧秦苑遗址，暮色压在大片绿芜之上，荒草齐腰，断墙残阶隐没其间。几只飞鸟从低空掠下，落向枯木与荒台，画面中不见宫人，只见废苑空阔与风吹草动。远景里宫阙轮廓已模糊，前景是潮湿草叶与散乱石块，中景是残破台基与稀疏灌木，背景是渐暗天空。文士可在画面边缘远远驻足，像是在凭吊旧迹。镜头平视拉开，强调鸟下与荒芜相映的空寂感，光线为落日最后一点余辉与草地冷绿交错，呈现盛衰更替的历史苍凉。" },
+  { sceneOrder: 6, title: "汉宫秋水", sourceLine: "蝉鸣黄叶汉宫秋 / 行人莫问当年事 / 故国东来渭水流", mood: "秋声、落叶与流水共同指向往昔帝业，感伤最终沉入无可挽回的历史长流。", prompt: "渭水岸边与汉宫旧址远远相连，深秋时节，梧桐与杨树黄叶纷落，几处残败宫墙在暮霭中若隐若现，空中有蝉鸣却更显寂寥。前景是一位路过的行人，与此前登楼的文士同为青色圆领长袍、黑色幞头，却神色更为怅惘，缓步停在水边，不发一言，只望着东来的渭水缓缓流过旧都。中景是斑驳宫阙、枯草与落叶，远景是河面反射最后一线暗金天光，水流向东延伸至画面尽头。镜头采用横向长景别，人物置于一侧，空出大面积河水与废墟，强调“莫问当年事”的沉默与“故国东来”的时间洪流感，整体色彩以黄褐、深青、灰黑为主，电影感写实，带淡淡水汽与历史沧桑。" }
+];
 const THEME_OPTIONS: Array<{ value: Theme; label: string; description: string }> = [
   { value: "light", label: "明亮工作台", description: "清晰、轻快的日常创作界面" },
   { value: "dark", label: "深色专业", description: "减少长时间看图的亮度干扰" },
@@ -101,6 +167,17 @@ function mergePromptItems(incoming: PromptHotlistItem[], existing: PromptHotlist
     seenPrompts.add(item.prompt);
     return true;
   }).slice(0, 120);
+}
+
+function getPoetryCollectionName(poem: string) {
+  const titleLine = poem.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "诗词意境";
+  const title = titleLine
+    .replace(/^#+\s*/, "")
+    .replace(/\*\*/g, "")
+    .replace(/[《》]/g, "")
+    .replace(/[\d①-⑳⑴-⒇]+$/u, "")
+    .trim();
+  return title.slice(0, 120) || "诗词意境";
 }
 
 async function readApiError(response: Response) {
@@ -163,6 +240,11 @@ function App() {
   const [librarySearch, setLibrarySearch] = useState("");
   const [libraryStatus, setLibraryStatus] = useState("");
   const [seriesOpen, setSeriesOpen] = useState(false);
+  const [poetryOpen, setPoetryOpen] = useState(false);
+  const [poetryProjects, setPoetryProjects] = useState<PoetryProject[]>([]);
+  const [activePoetryProjectId, setActivePoetryProjectId] = useState<number | null>(null);
+  const [poetryProjectSaving, setPoetryProjectSaving] = useState(false);
+  const [poetryProjectStatus, setPoetryProjectStatus] = useState("");
   const [styleWorkbenchOpen, setStyleWorkbenchOpen] = useState(false);
   const [seriesList, setSeriesList] = useState<SeriesRecord[]>([]);
   const [activeSeries, setActiveSeries] = useState<SeriesRecord | null>(null);
@@ -175,8 +257,44 @@ function App() {
   const [storyboardLoading, setStoryboardLoading] = useState(false);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+  const [poemText, setPoemText] = useState("咸阳城东楼\n许浑\n一上高城万里愁，蒹葭杨柳似汀洲。\n溪云初起日沉阁，山雨欲来风满楼。\n鸟下绿芜秦苑夕，蝉鸣黄叶汉宫秋。\n行人莫问当年事，故国东来渭水流。");
+  const [poetrySceneCount, setPoetrySceneCount] = useState(6);
+  const [poetryScenes, setPoetryScenes] = useState<PoetryScene[]>(() => DEFAULT_POETRY_SCENES.map((scene) => ({ ...scene })));
+  const [poetryStyleGuide, setPoetryStyleGuide] = useState(DEFAULT_POETRY_STYLE_GUIDE);
+  const [poetryPromptSupplement, setPoetryPromptSupplement] = useState("");
+  const [poetryAnalysis, setPoetryAnalysis] = useState<PoetryAnalysis | null>(() => structuredClone(DEFAULT_POETRY_ANALYSIS));
+  const [poetryLoadingAction, setPoetryLoadingAction] = useState<"analysis" | "storyboard" | null>(null);
+  const [poetryFailedStage, setPoetryFailedStage] = useState<PoetryWorkflowStage | null>(null);
+  const [poetryImageProgress, setPoetryImageProgress] = useState<PoetryImageProgress>({ status: "idle", completed: 0, total: 0, currentTitle: "" });
+  const [poetrySceneGenerationStates, setPoetrySceneGenerationStates] = useState<Record<number, PoetrySceneGenerationState>>({});
+  const [poetrySingleGenerating, setPoetrySingleGenerating] = useState(false);
+  const [poetryBatchGenerating, setPoetryBatchGenerating] = useState(false);
+  const [poetryStatus, setPoetryStatus] = useState("");
+  const [poetryProgress, setPoetryProgress] = useState("");
   const [activityStatus, setActivityStatus] = useState("准备就绪，可以开始创作。");
   const [activityTone, setActivityTone] = useState<"idle" | "working" | "success" | "error">("idle");
+  const poetryLoading = poetryLoadingAction !== null;
+  const poetryWorkflowSteps = [
+    {
+      key: "analysis" as const,
+      label: "意境分析",
+      state: poetryLoadingAction === "analysis" ? "active" : poetryFailedStage === "analysis" ? "error" : poetryAnalysis ? "done" : "pending",
+      detail: poetryLoadingAction === "analysis" ? "正在提取时空、意象和情绪" : poetryFailedStage === "analysis" ? "分析失败，请重试" : poetryAnalysis ? poetryAnalysis.lineReadings.length + " 段理解已可编辑" : "等待分析诗词"
+    },
+    {
+      key: "storyboard" as const,
+      label: "分镜提示词",
+      state: poetryLoadingAction === "storyboard" ? "active" : poetryFailedStage === "storyboard" ? "error" : poetryScenes.length ? "done" : "pending",
+      detail: poetryLoadingAction === "storyboard" ? "正在组织 " + poetrySceneCount + " 个连续画面" : poetryFailedStage === "storyboard" ? "分镜生成失败，请重试" : poetryScenes.length ? poetryScenes.length + " 段提示词已生成" : "等待确认意境分析"
+    },
+    {
+      key: "images" as const,
+      label: "图片生成",
+      state: poetryImageProgress.status === "running" ? "active" : poetryImageProgress.status === "error" ? "error" : poetryImageProgress.status === "done" ? "done" : "pending",
+      detail: poetryImageProgress.status === "running" ? "正在处理 " + poetryImageProgress.currentTitle : poetryImageProgress.status === "error" ? "生成结束，部分或全部失败" : poetryImageProgress.status === "done" ? "已处理 " + poetryImageProgress.completed + " / " + poetryImageProgress.total + " 张" : "等待选择单张或批量生成"
+    }
+  ];
+  const poetryImageProgressPercent = poetryImageProgress.total ? Math.round(poetryImageProgress.completed / poetryImageProgress.total * 100) : 0;
   const sourceInput = useRef<HTMLInputElement>(null);
   const maskInput = useRef<HTMLInputElement>(null);
   const inputLogged = useRef(false);
@@ -185,6 +303,9 @@ function App() {
   const previewDragRef = useRef<{ pointerId: number; startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
   const galleryCollapseInitialized = useRef(false);
   const managerCloseTimer = useRef<number | null>(null);
+  const poetryCollections = useRef(new Map<string, PoetryCollection>());
+  const poetryProjectLoadStarted = useRef(false);
+  const poetrySaveTimer = useRef<number | null>(null);
 
   function clearManagerCloseTimer() {
     if (managerCloseTimer.current !== null) {
@@ -196,6 +317,7 @@ function App() {
   function openManager(panel: ManagerPanel) {
     clearManagerCloseTimer();
     setManagerClosing(null);
+    setPoetryOpen(false);
     if (panel === "library") {
       setSeriesOpen(false);
       setLibraryOpen(true);
@@ -205,6 +327,118 @@ function App() {
       setSeriesOpen(true);
       void loadSeries();
     }
+  }
+
+  function openPoetryWorkbench() {
+    clearManagerCloseTimer();
+    setLibraryOpen(false);
+    setSeriesOpen(false);
+    setManagerClosing(null);
+    setPoetryOpen(true);
+    setPoetryStatus(poetryScenes.length ? "当前已有分段提示词，可直接检查和修改。" : "");
+    setPoetryProgress("");
+    if (!poetryProjectLoadStarted.current) void loadPoetryProjects(true);
+  }
+
+  function closePoetryWorkbench() {
+    setPoetryOpen(false);
+  }
+
+  function applyPoetryProject(project: PoetryProject) {
+    setActivePoetryProjectId(project.id);
+    setPoemText(project.poemText || "");
+    setPoetrySceneCount(project.sceneCount || 6);
+    setSize(project.imageSize || SIZES[0].value);
+    setPoetryPromptSupplement(project.promptSupplement || "");
+    setPoetryAnalysis(project.analysis || null);
+    setPoetryStyleGuide(project.styleGuide || "");
+    setPoetryScenes(Array.isArray(project.scenes) ? project.scenes : []);
+    setPoetrySceneGenerationStates({});
+    setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
+    setPoetryStatus(project.scenes?.length ? "已恢复上次进度，可以继续编辑或生成。" : "已打开诗词项目，可以继续分析。");
+    setPoetryProgress("");
+    setPoetryProjectStatus("已加载 · " + (project.updatedAt ? new Date(project.updatedAt).toLocaleString("zh-CN") : ""));
+  }
+
+  async function loadPoetryProjects(selectLatest = false) {
+    poetryProjectLoadStarted.current = true;
+    try {
+      const response = await fetch("/api/poetry/projects");
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      const projects = Array.isArray(data.projects) ? data.projects as PoetryProject[] : [];
+      setPoetryProjects(projects);
+      if (selectLatest && projects.length) applyPoetryProject(projects[0]);
+      else if (!projects.length) setPoetryProjectStatus(databaseConfigured ? "还没有保存的诗词项目" : "未连接数据库，项目不会跨刷新保存");
+    } catch (caught) {
+      setPoetryProjectStatus(caught instanceof Error ? caught.message : "读取诗词项目失败。");
+    }
+  }
+
+  async function openSavedPoetryProject(projectId: number) {
+    try {
+      const response = await fetch("/api/poetry/projects/" + projectId);
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      if (data.project) applyPoetryProject(data.project as PoetryProject);
+    } catch (caught) {
+      setPoetryProjectStatus(caught instanceof Error ? caught.message : "读取诗词项目失败。");
+    }
+  }
+
+  function poetryProjectPayload(overrides: Partial<Omit<PoetryProject, "id" | "seriesId" | "createdAt" | "updatedAt">> = {}): Omit<PoetryProject, "id" | "seriesId" | "createdAt" | "updatedAt"> {
+    return {
+      title: poetryAnalysis?.title || getPoetryCollectionName(poemText),
+      poemText: poemText.trim(),
+      sceneCount: poetrySceneCount,
+      imageSize: size,
+      promptSupplement: poetryPromptSupplement.trim(),
+      analysis: poetryAnalysis,
+      styleGuide: poetryStyleGuide,
+      scenes: poetryScenes,
+      ...overrides
+    };
+  }
+
+  async function savePoetryProject(options: { silent?: boolean; forceCreate?: boolean; overrides?: Partial<Omit<PoetryProject, "id" | "seriesId" | "createdAt" | "updatedAt">> } = {}) {
+    const payload = poetryProjectPayload(options.overrides);
+    if (!payload.poemText) return null;
+    if (poetryProjectSaving) return activePoetryProjectId;
+    setPoetryProjectSaving(true);
+    try {
+      const updating = activePoetryProjectId && !options.forceCreate;
+      const response = await fetch(updating ? "/api/poetry/projects/" + activePoetryProjectId : "/api/poetry/projects", {
+        method: updating ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      const project = data.project as PoetryProject;
+      setActivePoetryProjectId(project.id);
+      setPoetryProjects((projects) => [project, ...projects.filter((item) => item.id !== project.id)]);
+      setPoetryProjectStatus("已保存 · " + new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }));
+      return project.id;
+    } catch (caught) {
+      if (!options.silent) setPoetryProjectStatus(caught instanceof Error ? caught.message : "保存诗词项目失败。");
+      return null;
+    } finally {
+      setPoetryProjectSaving(false);
+    }
+  }
+
+  function startNewPoetryProject() {
+    setActivePoetryProjectId(null);
+    setPoemText("");
+    setPoetryAnalysis(null);
+    setPoetryScenes([]);
+    setPoetryStyleGuide("");
+    setPoetryPromptSupplement("");
+    setPoetrySceneGenerationStates({});
+    setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
+    setPoetryStatus("请输入诗词原文，然后分析意境。");
+    setPoetryProgress("");
+    setPoetryProjectStatus("新建诗词项目");
   }
 
   function closeManager(panel: ManagerPanel) {
@@ -322,6 +556,15 @@ function App() {
   }, [apiSettingsOpen]);
 
   useEffect(() => {
+    if (!poetryOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePoetryWorkbench();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [poetryOpen]);
+
+  useEffect(() => {
     if (!loading || !requestStartedAt) {
       setElapsedSeconds(0);
       return;
@@ -348,6 +591,21 @@ function App() {
     setCollapsedGalleryGroups(new Set(groupedHistory.map((group) => group.key)));
     galleryCollapseInitialized.current = true;
   }, [groupedHistory, historyLoading]);
+
+  useEffect(() => {
+    if (!activePoetryProjectId || !poetryOpen || poetryLoading || poetrySingleGenerating || poetryBatchGenerating || !poemText.trim()) return;
+    if (poetrySaveTimer.current !== null) window.clearTimeout(poetrySaveTimer.current);
+    poetrySaveTimer.current = window.setTimeout(() => {
+      poetrySaveTimer.current = null;
+      void savePoetryProject({ silent: true });
+    }, 900);
+    return () => {
+      if (poetrySaveTimer.current !== null) {
+        window.clearTimeout(poetrySaveTimer.current);
+        poetrySaveTimer.current = null;
+      }
+    };
+  }, [activePoetryProjectId, poetryOpen, poemText, poetrySceneCount, size, poetryPromptSupplement, poetryAnalysis, poetryStyleGuide, poetryScenes, poetryLoading, poetrySingleGenerating, poetryBatchGenerating]);
 
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
@@ -796,6 +1054,289 @@ function App() {
     logClientEvent("reference_image_removed", { referenceCount: Math.max(referenceImages.length - 1, 0) });
   }
 
+  async function analyzePoem() {
+    if (poetryLoading || poetrySingleGenerating || poetryBatchGenerating) return;
+    if (!poemText.trim()) {
+      setPoetryStatus("请输入诗词原文，可以粘贴多句或整首诗词。");
+      return;
+    }
+    setPoetryLoadingAction("analysis");
+    setPoetryFailedStage(null);
+    setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
+    setPoetrySceneGenerationStates({});
+    setPoetryAnalysis(null);
+    setPoetryScenes([]);
+    setPoetryStyleGuide("");
+    setPoetryProgress("");
+    setPoetryStatus("正在分析诗词的时空、意象、典故和情绪变化...");
+    setActivityStatus("正在理解诗词意境，完成后可先检查和修改分析结果。");
+    setActivityTone("working");
+    try {
+      const response = await fetch("/api/poetry/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ poem: poemText.trim() })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      if (!data.analysis || !Array.isArray(data.analysis.lineReadings)) throw new Error("没有得到完整的诗词意境分析。");
+      setPoetryAnalysis(data.analysis);
+      await savePoetryProject({ forceCreate: !activePoetryProjectId, overrides: { analysis: data.analysis, scenes: [], styleGuide: "" } });
+      setPoetryStatus("意境分析已完成。请检查和修改内容，确认后再生成分镜提示词。");
+      setActivityStatus("诗词意境分析完成，等待确认后生成分镜。");
+      setActivityTone("success");
+    } catch (caught) {
+      setPoetryFailedStage("analysis");
+      const message = caught instanceof Error ? caught.message : "诗词意境解析失败。";
+      setPoetryStatus(message);
+      setActivityStatus("诗词意境解析失败，请检查文本模型配置。");
+      setActivityTone("error");
+    } finally {
+      setPoetryLoadingAction(null);
+    }
+  }
+
+  function handlePoemTextChange(value: string) {
+    setPoemText(value);
+    setPoetryAnalysis(null);
+    setPoetryScenes([]);
+    setPoetryStyleGuide("");
+    setPoetryProgress("");
+    setPoetryFailedStage(null);
+    setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
+    setPoetrySceneGenerationStates({});
+    setPoetryStatus(value.trim() ? "诗词原文已修改，请重新分析意境。" : "");
+  }
+
+  async function generatePoetryStoryboard() {
+    if (poetryLoading || poetrySingleGenerating || poetryBatchGenerating) return;
+    if (!poetryAnalysis) {
+      setPoetryStatus("请先分析诗词意境，再根据确认后的内容生成分镜。");
+      return;
+    }
+    setPoetryLoadingAction("storyboard");
+    setPoetryFailedStage(null);
+    setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
+    setPoetrySceneGenerationStates({});
+    setPoetryScenes([]);
+    setPoetryStyleGuide("");
+    setPoetryProgress("");
+    setPoetryStatus("正在根据确认后的意境分析生成分镜提示词...");
+    setActivityStatus("正在把确认后的诗意分析转换为连续画面提示词。");
+    setActivityTone("working");
+    try {
+      const response = await fetch("/api/poetry/interpret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ poem: poemText.trim(), sceneCount: poetrySceneCount, analysis: poetryAnalysis })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const data = await response.json();
+      if (!Array.isArray(data.scenes) || !data.scenes.length) throw new Error("没有得到可用的诗词画面段落。");
+      setPoetryScenes(data.scenes);
+      setPoetryStyleGuide(typeof data.styleGuide === "string" ? data.styleGuide : "");
+      await savePoetryProject({ overrides: { analysis: poetryAnalysis, scenes: data.scenes, styleGuide: typeof data.styleGuide === "string" ? data.styleGuide : "" } });
+      setPoetryStatus("已生成 " + data.scenes.length + " 段画面提示词，可以编辑后逐段或批量出图。");
+      setActivityStatus("诗词分镜提示词已生成并可继续编辑。");
+      setActivityTone("success");
+    } catch (caught) {
+      setPoetryFailedStage("storyboard");
+      const message = caught instanceof Error ? caught.message : "诗词分镜生成失败。";
+      setPoetryStatus(message);
+      setActivityStatus("诗词分镜生成失败，请检查文本模型配置。 ");
+      setActivityTone("error");
+    } finally {
+      setPoetryLoadingAction(null);
+    }
+  }
+
+  async function ensurePoetryCollection() {
+    await savePoetryProject({ silent: true });
+    const collectionKey = poemText.trim();
+    let collection = poetryCollections.current.get(collectionKey);
+
+    if (!collection) {
+      const name = getPoetryCollectionName(poemText);
+      const seriesResponse = await fetch("/api/series");
+      if (!seriesResponse.ok) throw new Error(await readApiError(seriesResponse));
+      const seriesData = await seriesResponse.json();
+      const existingSeries = Array.isArray(seriesData.series) ? seriesData.series.find((item: SeriesRecord) => item.name === name) : null;
+      let series: SeriesRecord | null = existingSeries;
+
+      if (!series) {
+        const createSeriesResponse = await fetch("/api/series", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description: "诗词意境创作合集" })
+        });
+        if (!createSeriesResponse.ok) throw new Error(await readApiError(createSeriesResponse));
+        const createdSeriesData = await createSeriesResponse.json();
+        series = createdSeriesData.series;
+      }
+
+      if (!series) throw new Error("无法创建诗词合集。");
+      const nodesResponse = await fetch("/api/series/" + series.id + "/nodes");
+      if (!nodesResponse.ok) throw new Error(await readApiError(nodesResponse));
+      const nodesData = await nodesResponse.json();
+      collection = {
+        name,
+        series,
+        nodesByOrder: new Map<number, SeriesNode>((Array.isArray(nodesData.nodes) ? nodesData.nodes : []).map((node: SeriesNode) => [node.node_order, node]))
+      };
+      poetryCollections.current.set(collectionKey, collection);
+    }
+
+    for (const scene of poetryScenes) {
+      if (collection.nodesByOrder.has(scene.sceneOrder)) continue;
+      const createNodeResponse = await fetch("/api/series/" + collection.series.id + "/nodes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeOrder: scene.sceneOrder, title: scene.title, storyText: scene.sourceLine, prompt: scene.prompt })
+      });
+      if (!createNodeResponse.ok) throw new Error(await readApiError(createNodeResponse));
+      const createdNodeData = await createNodeResponse.json();
+      collection.nodesByOrder.set(scene.sceneOrder, createdNodeData.node);
+    }
+
+    return collection;
+  }
+
+  async function generatePoetrySceneImage(scene: PoetryScene, collection: PoetryCollection) {
+    const promptText = [poetryStyleGuide, poetryPromptSupplement.trim(), scene.prompt].filter(Boolean).join(" ");
+    const node = collection.nodesByOrder.get(scene.sceneOrder);
+    if (!node) throw new Error("诗词画面节点未创建，请重试。");
+    const response = await fetch("/api/images/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: promptText, size, title: scene.title, seriesName: collection.name, seriesId: collection.series.id, nodeId: node.id, nodeOrder: node.node_order })
+    });
+    if (!response.ok) throw new ImageRequestError(response.status, await readApiError(response));
+    const data = await response.json();
+    const result: Result = {
+      id: data.databaseId ? "db-" + data.databaseId : crypto.randomUUID(),
+      src: data.image,
+      imageRecordId: data.databaseId || null,
+      fileName: data.fileName,
+      seriesId: collection.series.id,
+      seriesName: collection.name,
+      nodeId: node.id,
+      nodeTitle: node.title,
+      nodeOrder: node.node_order,
+      prompt: data.revisedPrompt || promptText,
+      kind: "generate",
+      createdAt: new Date(),
+      versionId: data.versionId || null,
+      versionGroupId: data.versionGroupId || null,
+      versionNumber: data.versionNumber || null,
+      parentVersionId: data.parentVersionId || null,
+      isDelivery: Boolean(data.isDelivery)
+    };
+    return data.versionId ? result : enrichSessionVersion(result, null);
+  }
+
+  async function generatePoetrySceneImageWithRetry(scene: PoetryScene, collection: PoetryCollection, batchPosition?: { current: number; total: number }) {
+    return retryPoetryImageRequest(
+      () => generatePoetrySceneImage(scene, collection),
+      {
+        maxAttempts: 3,
+        baseDelayMs: 1000,
+        onRetry: (retry: { nextAttempt: number; maxAttempts: number; error: Error }) => {
+          const retryMessage = "临时错误，正在自动重试 " + retry.nextAttempt + " / " + retry.maxAttempts + "：" + retry.error.message;
+          setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "running", message: retryMessage, attempt: retry.nextAttempt } }));
+          setPoetryProgress(batchPosition
+            ? "第 " + batchPosition.current + " / " + batchPosition.total + " 段自动重试：" + scene.title + "（" + retry.nextAttempt + " / " + retry.maxAttempts + "）"
+            : scene.title + "自动重试中（" + retry.nextAttempt + " / " + retry.maxAttempts + "）");
+        }
+      }
+    );
+  }
+
+  async function generateOnePoetryScene(scene: PoetryScene) {
+    if (poetryBatchGenerating || poetrySingleGenerating || poetryLoading) return;
+    setPoetrySingleGenerating(true);
+    setPoetryFailedStage(null);
+    setPoetryImageProgress({ status: "running", completed: 0, total: 1, currentTitle: scene.title });
+    setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "running", message: "正在提交图片生成请求...", attempt: 1 } }));
+    setPoetryProgress("正在生成：" + scene.title);
+    setActivityStatus("正在根据“" + scene.title + "”生成图片...");
+    setActivityTone("working");
+    try {
+      const collection = await ensurePoetryCollection();
+      const result = await generatePoetrySceneImageWithRetry(scene, collection);
+      setCurrent(result);
+      setHistory((items) => [result, ...items].slice(0, 60));
+      setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "success", message: "图片已生成并保存，可再次生成", attempt: states[scene.sceneOrder]?.attempt || 1 } }));
+      setPoetryProgress("已生成：" + scene.title);
+      setPoetryImageProgress({ status: "done", completed: 1, total: 1, currentTitle: scene.title });
+      setPoetryStatus("单段图片已生成，可以继续调整其他段落。");
+      setActivityStatus("“" + scene.title + "”生成成功，图片已保存到桌面文件夹。");
+      setActivityTone("success");
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "图片生成失败。";
+      setPoetryFailedStage("images");
+      setPoetryImageProgress({ status: "error", completed: 0, total: 1, currentTitle: scene.title });
+      setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "error", message, attempt: states[scene.sceneOrder]?.attempt || 1 } }));
+      setPoetryProgress("生成失败：" + scene.title + "，" + message);
+      setActivityStatus("诗词画面生成失败，请查看错误信息。");
+      setActivityTone("error");
+    } finally {
+      setPoetrySingleGenerating(false);
+    }
+  }
+
+  async function generateAllPoetryScenes() {
+    if (!poetryScenes.length || poetryBatchGenerating || poetrySingleGenerating || poetryLoading) {
+      setPoetryStatus("请先解析诗词，生成画面提示词。");
+      return;
+    }
+    setPoetryBatchGenerating(true);
+    setPoetryFailedStage(null);
+    setPoetryImageProgress({ status: "running", completed: 0, total: poetryScenes.length, currentTitle: "正在准备合集" });
+    setPoetrySceneGenerationStates(Object.fromEntries(poetryScenes.map((scene) => [scene.sceneOrder, { status: "waiting", message: "等待生成", attempt: 0 }])) as Record<number, PoetrySceneGenerationState>);
+    setPoetryProgress("正在准备批量生成...");
+    setActivityStatus("诗词画面批量生成已开始。");
+    setActivityTone("working");
+    const generated: Result[] = [];
+    const failures: string[] = [];
+    try {
+      const collection = await ensurePoetryCollection();
+      for (const [index, scene] of poetryScenes.entries()) {
+        setPoetryImageProgress({ status: "running", completed: index, total: poetryScenes.length, currentTitle: scene.title });
+        setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "running", message: "正在生成第 " + (index + 1) + " 张...", attempt: 1 } }));
+        setPoetryProgress("正在生成第 " + scene.sceneOrder + " / " + poetryScenes.length + " 段：" + scene.title);
+        try {
+          generated.push(await generatePoetrySceneImageWithRetry(scene, collection, { current: index + 1, total: poetryScenes.length }));
+          setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "success", message: "图片已生成并保存", attempt: states[scene.sceneOrder]?.attempt || 1 } }));
+        } catch (caught) {
+          const message = caught instanceof Error ? caught.message : "请求失败";
+          failures.push(scene.title + "：" + message);
+          setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "error", message, attempt: states[scene.sceneOrder]?.attempt || 1 } }));
+        }
+        setPoetryImageProgress({ status: "running", completed: index + 1, total: poetryScenes.length, currentTitle: scene.title });
+      }
+      if (generated.length) {
+        setCurrent(generated.at(-1) || null);
+        setHistory((items) => [...generated.slice().reverse(), ...items].slice(0, 60));
+      }
+      setPoetryProgress("批量生成完成：成功 " + generated.length + " 段，失败 " + failures.length + " 段。" + (failures.length ? " 失败项已在对应分镜标出，可单独重新生成。" : ""));
+      setPoetryStatus("批量生成完成，可以在下方图库查看所有图片。");
+      setPoetryFailedStage(failures.length ? "images" : null);
+      setPoetryImageProgress({ status: failures.length ? "error" : "done", completed: poetryScenes.length, total: poetryScenes.length, currentTitle: "" });
+      setActivityStatus("诗词画面批量生成完成：成功 " + generated.length + " 段，失败 " + failures.length + " 段。");
+      setActivityTone(failures.length ? "error" : "success");
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "批量生成准备失败。";
+      setPoetryFailedStage("images");
+      setPoetryImageProgress({ status: "error", completed: generated.length + failures.length, total: poetryScenes.length, currentTitle: "" });
+      setPoetryProgress("批量生成中断：" + message);
+      setPoetryStatus("图片生成未能继续，请检查提示信息后重试。");
+      setActivityStatus("诗词画面批量生成中断，请查看错误信息。");
+      setActivityTone("error");
+    } finally {
+      setPoetryBatchGenerating(false);
+    }
+  }
+
   function clearMask() {
     if (maskPreview) releasePreview(maskPreview);
     setMaskFile(null);
@@ -1122,15 +1663,6 @@ function App() {
           <span>Image Assistant</span>
         </a>
         <div className="topbar-actions">
-          <button className="icon-button" type="button" onClick={() => openManager("library")} title="提示词库" aria-label="打开提示词库">
-            <Search size={17} />
-          </button>
-          <button className="icon-button" type="button" onClick={() => openManager("series")} title="系列创作" aria-label="打开系列创作">
-            <FolderKanban size={17} />
-          </button>
-          <button className="icon-button" type="button" onClick={openApiSettings} title="配置 API" aria-label="打开 API 配置">
-            <KeyRound size={17} />
-          </button>
           <div className="theme-picker">
             <button
               className="icon-button theme-toggle"
@@ -1172,8 +1704,8 @@ function App() {
         </div>
       </header>
       <div className={"activity-banner " + activityTone} role="status" aria-live="polite">
-        {(loading || promptIdeasLoading || storyboardLoading || batchGenerating) && <LoaderCircle className="spin" size={15} />}
-        {!(loading || promptIdeasLoading || storyboardLoading || batchGenerating) && activityTone === "success" && <CheckCircle2 size={15} />}
+        {(loading || promptIdeasLoading || storyboardLoading || batchGenerating || poetryLoading || poetrySingleGenerating || poetryBatchGenerating) && <LoaderCircle className="spin" size={15} />}
+        {!(loading || promptIdeasLoading || storyboardLoading || batchGenerating || poetryLoading || poetrySingleGenerating || poetryBatchGenerating) && activityTone === "success" && <CheckCircle2 size={15} />}
         <span>{activityStatus}</span>
       </div>
 
@@ -1384,6 +1916,22 @@ function App() {
             <WandSparkles size={20} />
             <span className="extension-tool-label">提取风格</span>
           </button>
+          <button className="extension-tool" type="button" onClick={() => openManager("library")} title="提示词库" aria-label="打开提示词库" data-label="提示词库">
+            <Search size={20} />
+            <span className="extension-tool-label">提示词库</span>
+          </button>
+          <button className="extension-tool" type="button" onClick={() => openManager("series")} title="系列创作" aria-label="打开系列创作" data-label="系列创作">
+            <FolderKanban size={20} />
+            <span className="extension-tool-label">系列创作</span>
+          </button>
+          <button className="extension-tool" type="button" onClick={openPoetryWorkbench} title="诗词意境" aria-label="打开诗词意境工作台" data-label="诗词意境">
+            <BookOpen size={20} />
+            <span className="extension-tool-label">诗词意境</span>
+          </button>
+          <button className="extension-tool" type="button" onClick={openApiSettings} title="配置 API" aria-label="打开 API 配置" data-label="API 配置">
+            <KeyRound size={20} />
+            <span className="extension-tool-label">API 配置</span>
+          </button>
           <button className="extension-tool planned" type="button" disabled title="反推提示词（规划中）" aria-label="反推提示词，规划中" data-label="反推提示词（规划中）">
             <Search size={20} />
             <span className="extension-tool-label">反推提示</span>
@@ -1398,6 +1946,137 @@ function App() {
           </button>
         </aside>
       </section>
+      {poetryOpen && (
+        <div className="poetry-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closePoetryWorkbench(); }}>
+          <section className="poetry-dialog" role="dialog" aria-modal="true" aria-label="诗词意境工作台">
+            <div className="poetry-toolbar">
+              <div><strong>诗词意境</strong><small>把诗句转换成连续画面，再按段生成图片</small></div>
+              <button className="icon-button" type="button" onClick={closePoetryWorkbench} title="关闭诗词意境" aria-label="关闭诗词意境"><X size={18} /></button>
+            </div>
+            <div className="poetry-body">
+              <section className="poetry-projects" aria-label="已保存诗词">
+                <div className="poetry-projects-heading"><div><strong>已保存诗词</strong><small>{poetryProjects.length ? "选择后继续上次的分析、分镜和出图" : "每次分析或生成后会保存到数据库"}</small></div><button type="button" onClick={startNewPoetryProject}><Plus size={13} />新建</button></div>
+                {poetryProjects.length > 0 && <div className="poetry-project-list">
+                  {poetryProjects.slice(0, 8).map((project) => <button type="button" className={"poetry-project-item" + (activePoetryProjectId === project.id ? " active" : "")} key={project.id} onClick={() => void openSavedPoetryProject(project.id)}><span><strong>{project.title}</strong><small>{project.scenes?.length || 0} 段分镜 · {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString("zh-CN") : "已保存"}</small></span><ChevronDown size={14} /></button>)}
+                </div>}
+                <p className="poetry-project-status" role="status">{poetryProjectSaving ? "正在保存项目..." : poetryProjectStatus}</p>
+              </section>
+              <div className="poetry-input-section">
+                <label htmlFor="poem-input">诗词原文</label>
+                <textarea id="poem-input" value={poemText} onChange={(event) => handlePoemTextChange(event.target.value)} placeholder="粘贴整首诗词或多句诗文，例如：春江潮水连海平，海上明月共潮生……" rows={5} />
+                <p className="poetry-collection-note"><FolderKanban size={14} />图片合集：{getPoetryCollectionName(poemText)}</p>
+                <label htmlFor="poetry-prompt-supplement">整体提示词补充</label>
+                <textarea id="poetry-prompt-supplement" value={poetryPromptSupplement} onChange={(event) => setPoetryPromptSupplement(event.target.value)} placeholder="例如：真实感手机，90年代摄像机真实拍摄效果，35mm复古胶片实拍质感" rows={3} />
+                <div className="poetry-actions">
+                  <label htmlFor="poetry-scene-count">画面段数</label>
+                  <select id="poetry-scene-count" value={poetrySceneCount} onChange={(event) => setPoetrySceneCount(Number(event.target.value))}>
+                    {[3, 4, 5, 6, 7, 8].map((count) => <option key={count} value={count}>{count} 段{count === 6 ? "（默认）" : ""}</option>)}
+                  </select>
+                  <label htmlFor="poetry-image-size">图片比例</label>
+                  <select id="poetry-image-size" value={size} onChange={(event) => setSize(event.target.value)}>
+                    {SIZES.map((option) => <option key={option.value} value={option.value}>{option.name} · {option.detail}</option>)}
+                  </select>
+                  <button type="button" onClick={() => void analyzePoem()} disabled={poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryLoadingAction === "analysis" ? <LoaderCircle className="spin" size={14} /> : <BookOpen size={14} />}{poetryLoadingAction === "analysis" ? "正在分析" : "分析诗词意境"}</button>
+                  <button type="button" className="primary" onClick={() => void generatePoetryStoryboard()} disabled={!poetryAnalysis || poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryLoadingAction === "storyboard" ? <LoaderCircle className="spin" size={14} /> : <WandSparkles size={14} />}{poetryLoadingAction === "storyboard" ? "正在生成分镜" : "生成分镜提示词"}</button>
+                  <button type="button" onClick={() => void generateAllPoetryScenes()} disabled={!poetryScenes.length || poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryBatchGenerating ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}{poetryBatchGenerating ? "正在批量生成" : "批量生成全部"}</button>
+                </div>
+              </div>
+              <section className="poetry-workflow" aria-label="诗词创作进度" aria-live="polite">
+                <div className="poetry-workflow-steps">
+                  {poetryWorkflowSteps.map((step, index) => (
+                    <div className={"poetry-workflow-step " + step.state} key={step.key}>
+                      <span className="poetry-workflow-indicator" aria-hidden="true">
+                        {step.state === "active" && <LoaderCircle className="spin" size={14} />}
+                        {step.state === "done" && <CheckCircle2 size={14} />}
+                        {step.state === "error" && <CircleAlert size={14} />}
+                        {step.state === "pending" && index + 1}
+                      </span>
+                      <div><strong>{step.label}</strong><small>{step.detail}</small></div>
+                    </div>
+                  ))}
+                </div>
+                {poetryImageProgress.status !== "idle" && poetryImageProgress.total > 0 && (
+                  <div className="poetry-image-progress">
+                    <div className="poetry-image-progress-heading"><span>图片处理进度</span><strong>{poetryImageProgress.completed} / {poetryImageProgress.total}</strong></div>
+                    <div className="poetry-image-progress-track" role="progressbar" aria-label="图片处理进度" aria-valuemin={0} aria-valuemax={poetryImageProgress.total} aria-valuenow={poetryImageProgress.completed}><span style={{ width: poetryImageProgressPercent + "%" }} /></div>
+                  </div>
+                )}
+                {(poetryStatus || poetryProgress) && <div className="poetry-workflow-message">
+                  {poetryStatus && <p>{poetryStatus}</p>}
+                  {poetryProgress && <small>{poetryProgress}</small>}
+                </div>}
+              </section>
+              {poetryAnalysis && (
+                <section className="poetry-analysis" aria-labelledby="poetry-analysis-heading">
+                  <div className="poetry-analysis-heading">
+                    <div><strong id="poetry-analysis-heading">意境分析</strong><small>可直接修改，分镜会以这里确认的内容为准</small></div>
+                    <span>{poetryAnalysis.lineReadings.length} 段逐句理解</span>
+                  </div>
+                  <div className="poetry-analysis-meta">
+                    <label>题目<input value={poetryAnalysis.title} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, title: event.target.value } : analysis)} /></label>
+                    <label>作者<input value={poetryAnalysis.author} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, author: event.target.value } : analysis)} /></label>
+                    <label>朝代<input value={poetryAnalysis.dynasty} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, dynasty: event.target.value } : analysis)} /></label>
+                  </div>
+                  <div className="poetry-analysis-grid">
+                    <label className="poetry-analysis-field">主题<textarea value={poetryAnalysis.theme} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, theme: event.target.value } : analysis)} rows={2} /></label>
+                    <label className="poetry-analysis-field wide">整体解读<textarea value={poetryAnalysis.overview} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, overview: event.target.value } : analysis)} rows={4} /></label>
+                    <label className="poetry-analysis-field">时空背景<textarea value={poetryAnalysis.timeAndPlace} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, timeAndPlace: event.target.value } : analysis)} rows={3} /></label>
+                    <label className="poetry-analysis-field">情绪变化<textarea value={poetryAnalysis.emotionalArc} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, emotionalArc: event.target.value } : analysis)} rows={3} /></label>
+                    <label className="poetry-analysis-field wide">核心意象<input value={poetryAnalysis.coreImagery.join("，")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, coreImagery: event.target.value.split(/[,，、]/u).map((item) => item.trim()).filter(Boolean) } : analysis)} placeholder="用逗号分隔" /></label>
+                  </div>
+                  <div className="poetry-line-readings">
+                    <strong>逐句理解</strong>
+                    {poetryAnalysis.lineReadings.map((reading, index) => (
+                      <div className="poetry-line-reading" key={index}>
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <label>原句<input value={reading.sourceLine} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, lineReadings: analysis.lineReadings.map((item, itemIndex) => itemIndex === index ? { ...item, sourceLine: event.target.value } : item) } : analysis)} /></label>
+                        <label>释义<textarea value={reading.meaning} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, lineReadings: analysis.lineReadings.map((item, itemIndex) => itemIndex === index ? { ...item, meaning: event.target.value } : item) } : analysis)} rows={2} /></label>
+                        <label>情绪<textarea value={reading.emotion} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, lineReadings: analysis.lineReadings.map((item, itemIndex) => itemIndex === index ? { ...item, emotion: event.target.value } : item) } : analysis)} rows={2} /></label>
+                        <label>视觉重点<textarea value={reading.visualFocus} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, lineReadings: analysis.lineReadings.map((item, itemIndex) => itemIndex === index ? { ...item, visualFocus: event.target.value } : item) } : analysis)} rows={2} /></label>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="poetry-analysis-notes">
+                    <strong>典故与存疑</strong>
+                    {poetryAnalysis.allusions.map((allusion, index) => (
+                      <div className="poetry-allusion" key={index}>
+                        <input aria-label={"典故 " + (index + 1)} value={allusion.sourceText} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, allusions: analysis.allusions.map((item, itemIndex) => itemIndex === index ? { ...item, sourceText: event.target.value } : item) } : analysis)} />
+                        <textarea aria-label={allusion.sourceText + "解释"} value={allusion.explanation} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, allusions: analysis.allusions.map((item, itemIndex) => itemIndex === index ? { ...item, explanation: event.target.value } : item) } : analysis)} rows={2} />
+                        <select aria-label={allusion.sourceText + "可信度"} value={allusion.confidence} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, allusions: analysis.allusions.map((item, itemIndex) => itemIndex === index ? { ...item, confidence: event.target.value as PoetryAllusion["confidence"] } : item) } : analysis)}><option value="high">高可信</option><option value="medium">中可信</option><option value="low">低可信</option></select>
+                      </div>
+                    ))}
+                    <label>存疑点<textarea value={poetryAnalysis.uncertainties.join("\n")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, uncertainties: event.target.value.split(/\r?\n/u).map((item) => item.trim()).filter(Boolean) } : analysis)} rows={3} /></label>
+                  </div>
+                </section>
+              )}
+              {poetryStyleGuide && <p className="poetry-style-guide"><strong>统一视觉：</strong>{poetryStyleGuide}</p>}
+              {poetryScenes.length > 0 && <div className="poetry-scene-list">
+                {poetryScenes.map((scene, index) => {
+                  const generationState = poetrySceneGenerationStates[scene.sceneOrder];
+                  return (
+                    <article className={"poetry-scene" + (generationState ? " generation-" + generationState.status : "")} key={scene.sceneOrder + "-" + scene.title}>
+                      <div className="poetry-scene-heading"><span>{String(scene.sceneOrder).padStart(2, "0")}</span><strong>{scene.title}</strong><button type="button" onClick={() => void generateOnePoetryScene(scene)} disabled={poetryLoading || poetrySingleGenerating || poetryBatchGenerating} title={(generationState?.status === "error" ? "重新生成" : "生成") + scene.title} aria-label={(generationState?.status === "error" ? "重新生成" : "生成") + scene.title}>{generationState?.status === "running" ? <LoaderCircle className="spin" size={14} /> : generationState?.status === "error" ? <RotateCcw size={14} /> : <Sparkles size={14} />}</button></div>
+                      <p className="poetry-source">{scene.sourceLine}</p>
+                      <p className="poetry-mood">{scene.mood}</p>
+                      <textarea aria-label={scene.title + "画面提示词"} value={scene.prompt} onChange={(event) => setPoetryScenes((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, prompt: event.target.value } : item))} rows={4} />
+                      {generationState && <div className={"poetry-scene-generation-status " + generationState.status}>
+                        {generationState.status === "running" && <LoaderCircle className="spin" size={13} />}
+                        {generationState.status === "success" && <CheckCircle2 size={13} />}
+                        {generationState.status === "error" && <CircleAlert size={13} />}
+                        {generationState.status === "waiting" && <Clock3 size={13} />}
+                        <span>{generationState.message}</span>
+                        {generationState.status === "error" && <button type="button" onClick={() => void generateOnePoetryScene(scene)} disabled={poetryLoading || poetrySingleGenerating || poetryBatchGenerating}><RotateCcw size={12} />重新生成</button>}
+                      </div>}
+                    </article>
+                  );
+                })}
+              </div>}
+              {!poetryAnalysis && !poetryLoading && <p className="poetry-empty">输入诗词后点击“分析诗词意境”。</p>}
+              {poetryAnalysis && !poetryScenes.length && !poetryLoading && <p className="poetry-empty">检查上方分析内容，确认后点击“生成分镜提示词”。</p>}
+            </div>
+          </section>
+        </div>
+      )}
       {apiSettingsOpen && (
         <div className="api-settings-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeApiSettings(); }}>
           <section className="api-settings-dialog" role="dialog" aria-modal="true" aria-label="API 配置">
