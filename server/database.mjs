@@ -110,6 +110,8 @@ async function migrateDatabase(connection) {
       prompt_supplement TEXT NULL,
       analysis_json JSON NULL,
       style_guide TEXT NULL,
+      character_bible TEXT NULL,
+      continuity_guide TEXT NULL,
       scenes_json JSON NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -119,6 +121,14 @@ async function migrateDatabase(connection) {
       CONSTRAINT fk_poetry_projects_series FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Keep existing installations compatible with the continuity fields added after the first schema.
+  for (const column of ["character_bible", "continuity_guide"]) {
+    try {
+      await connection.query(`ALTER TABLE poetry_projects ADD COLUMN ${column} TEXT NULL`);
+    } catch (error) {
+      if (error?.code !== "ER_DUP_FIELDNAME") throw error;
+    }
+  }
   await connection.query(`
     CREATE TABLE IF NOT EXISTS image_records (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -505,6 +515,8 @@ function toPoetryProject(row) {
     promptSupplement: row.prompt_supplement || "",
     analysis: parseJsonColumn(row.analysis_json, null),
     styleGuide: row.style_guide || "",
+    characterBible: row.character_bible || "",
+    continuityGuide: row.continuity_guide || "",
     scenes: parseJsonColumn(row.scenes_json, []),
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -533,6 +545,8 @@ function normalizePoetryProject(input) {
     promptSupplement: String(input.promptSupplement || "").trim().slice(0, 4000),
     analysis: input.analysis && typeof input.analysis === "object" && !Array.isArray(input.analysis) ? input.analysis : null,
     styleGuide: String(input.styleGuide || "").trim().slice(0, 4000),
+    characterBible: String(input.characterBible || "").trim().slice(0, 6000),
+    continuityGuide: String(input.continuityGuide || "").trim().slice(0, 6000),
     scenes
   };
 }
@@ -569,8 +583,8 @@ export async function upsertPoetryProject(input, id = null) {
       if (!existing[0]) throw new Error("诗词项目不存在。");
       seriesId = Number(existing[0].series_id);
       await connection.query(
-        "UPDATE poetry_projects SET title=?, poem_text=?, scene_count=?, image_size=?, prompt_supplement=?, analysis_json=?, style_guide=?, scenes_json=? WHERE id=?",
-        [project.title, project.poemText, project.sceneCount, project.imageSize, project.promptSupplement || null, project.analysis ? JSON.stringify(project.analysis) : null, project.styleGuide || null, JSON.stringify(project.scenes), projectId]
+        "UPDATE poetry_projects SET title=?, poem_text=?, scene_count=?, image_size=?, prompt_supplement=?, analysis_json=?, style_guide=?, character_bible=?, continuity_guide=?, scenes_json=? WHERE id=?",
+        [project.title, project.poemText, project.sceneCount, project.imageSize, project.promptSupplement || null, project.analysis ? JSON.stringify(project.analysis) : null, project.styleGuide || null, project.characterBible || null, project.continuityGuide || null, JSON.stringify(project.scenes), projectId]
       );
       await connection.query(
         "UPDATE series SET name=?, description='诗词意境创作合集', global_prompt=?, style_prompt=? WHERE id=?",
@@ -583,8 +597,8 @@ export async function upsertPoetryProject(input, id = null) {
       );
       seriesId = Number(seriesResult.insertId);
       const [projectResult] = await connection.query(
-        "INSERT INTO poetry_projects (series_id, title, poem_text, scene_count, image_size, prompt_supplement, analysis_json, style_guide, scenes_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [seriesId, project.title, project.poemText, project.sceneCount, project.imageSize, project.promptSupplement || null, project.analysis ? JSON.stringify(project.analysis) : null, project.styleGuide || null, JSON.stringify(project.scenes)]
+        "INSERT INTO poetry_projects (series_id, title, poem_text, scene_count, image_size, prompt_supplement, analysis_json, style_guide, character_bible, continuity_guide, scenes_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [seriesId, project.title, project.poemText, project.sceneCount, project.imageSize, project.promptSupplement || null, project.analysis ? JSON.stringify(project.analysis) : null, project.styleGuide || null, project.characterBible || null, project.continuityGuide || null, JSON.stringify(project.scenes)]
       );
       projectId = Number(projectResult.insertId);
     }

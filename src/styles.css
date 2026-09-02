@@ -554,12 +554,16 @@ body { font-size: 14px; line-height: 1.55; }
 .poetry-analysis-meta { display: grid; grid-template-columns: 1.4fr 1fr .7fr; gap: 10px; }
 .poetry-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .poetry-analysis-field.wide { grid-column: 1 / -1; }
-.poetry-analysis label, .poetry-line-readings > strong, .poetry-analysis-notes > strong { display: grid; gap: 5px; color: var(--text-muted); font-size: 10px; font-weight: 800; }
+.poetry-analysis label, .poetry-line-readings > strong, .poetry-analysis-notes > strong, .poetry-sensory-analysis > strong, .poetry-annotations > strong { display: grid; gap: 5px; color: var(--text-muted); font-size: 10px; font-weight: 800; }
 .poetry-analysis input, .poetry-analysis textarea, .poetry-analysis select { width: 100%; min-width: 0; border: 1px solid var(--border-subtle); border-radius: 5px; outline: 0; color: var(--text-strong); background: var(--surface-subtle); font: inherit; font-weight: 500; line-height: 1.55; }
 .poetry-analysis input, .poetry-analysis select { min-height: 34px; padding: 0 9px; }
 .poetry-analysis textarea { resize: vertical; padding: 8px 9px; }
 .poetry-analysis input:focus, .poetry-analysis textarea:focus, .poetry-analysis select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent), transparent 84%); }
 .poetry-line-readings, .poetry-analysis-notes { display: grid; gap: 9px; }
+.poetry-sensory-analysis, .poetry-annotations { display: grid; gap: 9px; padding-top: 2px; }
+.poetry-sensory-analysis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.poetry-sensory-analysis > strong, .poetry-annotations > strong { grid-column: 1 / -1; }
+.poetry-annotation { display: grid; grid-template-columns: minmax(110px, .55fr) minmax(0, 2fr); gap: 8px; align-items: start; }
 .poetry-line-reading { display: grid; grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
 .poetry-line-reading > span { grid-row: 1 / 3; padding-top: 23px; color: var(--accent); font: 10px "DM Mono", monospace; }
 .poetry-line-reading > label:first-of-type { grid-column: 2 / -1; }
@@ -568,6 +572,12 @@ body { font-size: 14px; line-height: 1.55; }
 .poetry-analysis-notes > label { padding-top: 2px; }
 .poetry-style-guide { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); color: var(--text-muted); background: var(--accent-soft); font-size: 11px; line-height: 1.6; }
 .poetry-style-guide strong { color: var(--text-strong); }
+.poetry-continuity-panel { display: grid; gap: 8px; }
+.poetry-continuity-panel > label { display: grid; gap: 4px; color: var(--text-muted); font-size: 11px; }
+.poetry-continuity-panel > label span { color: var(--text-strong); font-weight: 700; }
+.poetry-continuity-panel textarea { width: 100%; min-height: 54px; resize: vertical; }
+.poetry-scene-recommendation { align-self: end; color: var(--text-muted); font-size: 11px; line-height: 1.4; max-width: 240px; }
+.poetry-recommendation-button { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .poetry-scene-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .poetry-scene { display: grid; min-width: 0; align-content: start; gap: 7px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-panel); }
 .poetry-scene.generation-running { border-color: color-mix(in srgb, var(--accent), transparent 35%); }
@@ -588,6 +598,7 @@ body { font-size: 14px; line-height: 1.55; }
 .poetry-scene-generation-status button:hover:not(:disabled) { color: #fff; background: var(--danger); }
 .poetry-scene-generation-status button:disabled { opacity: .5; cursor: not-allowed; }
 .poetry-empty, .poetry-status, .poetry-progress { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.poetry-legacy-analysis-note { margin: 0; padding: 10px 12px; color: var(--text-muted); background: var(--accent-soft); border-left: 3px solid var(--accent); font-size: 11px; line-height: 1.6; }
 .poetry-status { color: var(--accent); }
 .poetry-progress { padding-top: 8px; border-top: 1px solid var(--border-subtle); }
 @keyframes poetry-drawer-in { from { opacity: .7; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
@@ -604,6 +615,7 @@ body { font-size: 14px; line-height: 1.55; }
   .poetry-workflow-message small { text-align: left; }
   .poetry-analysis-heading { align-items: flex-start; }
   .poetry-analysis-meta, .poetry-analysis-grid { grid-template-columns: 1fr; }
+  .poetry-sensory-analysis { grid-template-columns: 1fr; }
   .poetry-analysis-field.wide { grid-column: auto; }
   .poetry-line-reading { grid-template-columns: 24px 1fr; }
   .poetry-line-reading > span { grid-row: 1 / 5; }

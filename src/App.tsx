@@ -79,12 +79,24 @@ type SeriesNode = { id: number; series_id: number; node_order: number; title: st
 type PoetryScene = { sceneOrder: number; title: string; sourceLine: string; mood: string; prompt: string };
 type PoetryLineReading = { sourceLine: string; meaning: string; emotion: string; visualFocus: string };
 type PoetryAllusion = { sourceText: string; explanation: string; confidence: "high" | "medium" | "low" };
+type PoetryAnnotation = { term: string; explanation: string };
+type PoetrySensoryDetails = { visual: string; auditory: string; spatial: string; temporal: string };
 type PoetryAnalysis = {
   title: string;
   author: string;
   dynasty: string;
+  genre: string;
+  tags: string[];
   theme: string;
   overview: string;
+  translation: string;
+  annotations: PoetryAnnotation[];
+  creationBackground: string;
+  historicalContext: string;
+  structureAnalysis: string;
+  literaryDevices: string;
+  sensoryDetails: PoetrySensoryDetails;
+  appreciation: string;
   timeAndPlace: string;
   emotionalArc: string;
   coreImagery: string[];
@@ -102,6 +114,8 @@ type PoetryProject = {
   promptSupplement: string;
   analysis: PoetryAnalysis | null;
   styleGuide: string;
+  characterBible: string;
+  continuityGuide: string;
   scenes: PoetryScene[];
   createdAt?: string;
   updatedAt?: string;
@@ -117,12 +131,27 @@ const SIZES = [
 const MAX_REFERENCE_IMAGES = 10;
 const STORYBOARD_STYLE_PREFIX = "写实、现实质感的东方志怪电影摄影风格，古代中国环境，可信的人物比例和材质，统一角色外貌、服装、时代与光影，不要卡通、插画或现代物品。";
 const DEFAULT_POETRY_STYLE_GUIDE = "整体采用唐代长安旧都的历史氛围，统一为黄昏到入夜前的冷暖交替色调，人物为同一位中年文士，青色圆领长袍、黑色幞头、浅灰旧氅衣，始终以电影感写实水墨风呈现，强调高城、渭水、荒苑、秋叶、风雨与远眺的连续空间关系。";
+const DEFAULT_POETRY_CHARACTER_BIBLE = "固定主角：同一位中年男性文士，面容清瘦、眉骨分明、肤色偏白、黑色长发束于黑色幞头，体型修长。固定服装：青色圆领长袍，外罩浅灰旧氅衣，深色腰带与布靴；固定配饰与道具：木簪、旧竹简和木栏，不可改变年龄、脸型、发型、服装颜色材质款式、配饰、道具和唐代身份。";
+const DEFAULT_POETRY_CONTINUITY_GUIDE = "连续性锁定：所有分镜使用同一位中年文士、同一套青色圆领长袍与浅灰旧氅衣、黑色幞头、同一时代和写实电影感水墨摄影。后续只允许风雨、光线、姿态和场景位置随诗句推进而变化，禁止换衣服、换发型、改变年龄体型、替换固定道具或切换画风、色彩和镜头质感。";
 const DEFAULT_POETRY_ANALYSIS: PoetryAnalysis = {
   title: "咸阳城东楼",
   author: "许浑",
   dynasty: "唐",
+  genre: "七言律诗",
+  tags: ["写景", "怀古", "抒情"],
   theme: "登临怀古，在风雨将至的自然景象中感叹故国兴亡与身世漂泊。",
   overview: "诗人登上咸阳城东楼远眺，从蒹葭杨柳、溪云落日写到满楼风雨，再由秦苑、汉宫的荒凉秋景转入怀古。全诗把眼前天气变化、旧都遗迹与个人愁绪合为一体，最后以东流渭水收束，历史盛衰终归无言。",
+  translation: "诗人一登上高城便涌起万里愁绪，眼前的芦苇杨柳仿佛江南水边的汀洲。溪谷云气刚刚升起，落日沉入楼阁之后，山雨将至，急风已经吹满高楼。黄昏时飞鸟落入秦苑荒草，秋蝉在汉宫黄叶间鸣叫。过路人不必追问当年的旧事，故国旁的渭水仍向东流。",
+  annotations: [
+    { term: "汀洲", explanation: "水中或水边的平地，这里写芦苇杨柳相连的水岸，也带有江南水乡的联想。" },
+    { term: "秦苑、汉宫", explanation: "秦汉旧日宫苑遗址，以昔日帝都的繁华反衬眼前荒凉。" }
+  ],
+  creationBackground: "许浑登临咸阳城东楼，面对秦汉旧都遗迹和秋日风雨，将眼前景象与历史兴亡联系起来。具体创作年份缺乏统一定论，分析时不把传说当作确证。",
+  historicalContext: "咸阳与长安一带曾是秦汉及后世王朝的政治中心，秦苑、汉宫的旧迹构成怀古背景。",
+  structureAnalysis: "首联登高触景生愁；颔联由云、日转入风雨将至；颈联以秦苑、汉宫的秋景写盛衰；尾联以渭水东流收束，把个人愁绪推向历史长流。",
+  literaryDevices: "借景抒情、虚实相生、对比和象征并用；以沉日、风雨、荒草、黄叶和东流渭水把抽象的愁绪与兴亡感转化为可见景物。",
+  sensoryDetails: { visual: "高城、蒹葭杨柳、溪云落日、荒苑残墙、黄叶与渭水，色调由冷青灰过渡到暗金和深青。", auditory: "风满楼、鸟下、蝉鸣和水流声形成由静到动、再归于寂静的听觉层次。", spatial: "视线从高城近景推向城外水岸、秦苑汉宫遗址，最后沿渭水向东方延伸。", temporal: "深秋黄昏，云起日沉，风雨将至，暮色逐步加深。" },
+  appreciation: "全诗把登楼所见的秋日晚景、风雨预兆与秦汉故国的历史遗迹融为一体，前六句以写景层层推进，尾联由眼前流水转入对历史无常的沉思，情景交融而含蓄有力。",
   timeAndPlace: "深秋黄昏，咸阳城东楼及城外渭水、秦苑与汉宫旧址；视线由高楼远眺逐渐移向荒苑和东流水。",
   emotionalArc: "登高即生万里愁，继而因暮云、落日和骤风感到压迫不安；看到秦汉故苑的鸟、蝉与黄叶后转为历史苍凉，最终沉入不问往事的克制与无奈。",
   coreImagery: ["高城", "蒹葭", "杨柳", "溪云", "落日", "满楼风", "秦苑", "黄叶", "汉宫", "渭水"],
@@ -178,6 +207,34 @@ function getPoetryCollectionName(poem: string) {
     .replace(/[\d①-⑳⑴-⒇]+$/u, "")
     .trim();
   return title.slice(0, 120) || "诗词意境";
+}
+
+function getPoetrySceneRecommendation(poem: string, analysis: PoetryAnalysis | null) {
+  const semanticCount = analysis?.lineReadings.length || poem.split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line && /[，。；！？、]$/u.test(line) && !/^作者|^朝代/u.test(line)).length;
+  const count = semanticCount <= 4 ? 4 : semanticCount <= 6 ? 6 : Math.min(8, semanticCount);
+  const reason = semanticCount <= 4
+    ? "适合用 4 段呈现起承转合"
+    : semanticCount <= 6
+      ? "适合用 6 段展开意象和情绪转折"
+      : "诗句较多，建议控制在 8 段以内";
+  return { count, reason };
+}
+
+function hydratePoetryAnalysis(value: Partial<PoetryAnalysis> | null | undefined): PoetryAnalysis | null {
+  if (!value) return null;
+  return {
+    ...DEFAULT_POETRY_ANALYSIS,
+    ...value,
+    tags: Array.isArray(value.tags) ? value.tags : [],
+    annotations: Array.isArray(value.annotations) ? value.annotations : [],
+    sensoryDetails: { ...DEFAULT_POETRY_ANALYSIS.sensoryDetails, ...(value.sensoryDetails || {}) },
+    coreImagery: Array.isArray(value.coreImagery) ? value.coreImagery : [],
+    lineReadings: Array.isArray(value.lineReadings) ? value.lineReadings : [],
+    allusions: Array.isArray(value.allusions) ? value.allusions : [],
+    uncertainties: Array.isArray(value.uncertainties) ? value.uncertainties : []
+  };
 }
 
 async function readApiError(response: Response) {
@@ -261,6 +318,8 @@ function App() {
   const [poetrySceneCount, setPoetrySceneCount] = useState(6);
   const [poetryScenes, setPoetryScenes] = useState<PoetryScene[]>(() => DEFAULT_POETRY_SCENES.map((scene) => ({ ...scene })));
   const [poetryStyleGuide, setPoetryStyleGuide] = useState(DEFAULT_POETRY_STYLE_GUIDE);
+  const [poetryCharacterBible, setPoetryCharacterBible] = useState(DEFAULT_POETRY_CHARACTER_BIBLE);
+  const [poetryContinuityGuide, setPoetryContinuityGuide] = useState(DEFAULT_POETRY_CONTINUITY_GUIDE);
   const [poetryPromptSupplement, setPoetryPromptSupplement] = useState("");
   const [poetryAnalysis, setPoetryAnalysis] = useState<PoetryAnalysis | null>(() => structuredClone(DEFAULT_POETRY_ANALYSIS));
   const [poetryLoadingAction, setPoetryLoadingAction] = useState<"analysis" | "storyboard" | null>(null);
@@ -279,7 +338,7 @@ function App() {
       key: "analysis" as const,
       label: "意境分析",
       state: poetryLoadingAction === "analysis" ? "active" : poetryFailedStage === "analysis" ? "error" : poetryAnalysis ? "done" : "pending",
-      detail: poetryLoadingAction === "analysis" ? "正在提取时空、意象和情绪" : poetryFailedStage === "analysis" ? "分析失败，请重试" : poetryAnalysis ? poetryAnalysis.lineReadings.length + " 段理解已可编辑" : "等待分析诗词"
+      detail: poetryLoadingAction === "analysis" ? "正在提取时空、意象和情绪" : poetryFailedStage === "analysis" ? "分析失败，请重试" : poetryAnalysis ? (poetryAnalysis.lineReadings || []).length + " 段理解已可编辑" : "等待分析诗词"
     },
     {
       key: "storyboard" as const,
@@ -350,12 +409,18 @@ function App() {
     setPoetrySceneCount(project.sceneCount || 6);
     setSize(project.imageSize || SIZES[0].value);
     setPoetryPromptSupplement(project.promptSupplement || "");
-    setPoetryAnalysis(project.analysis || null);
+    setPoetryAnalysis(hydratePoetryAnalysis(project.analysis));
     setPoetryStyleGuide(project.styleGuide || "");
+    setPoetryCharacterBible(project.characterBible || DEFAULT_POETRY_CHARACTER_BIBLE);
+    setPoetryContinuityGuide(project.continuityGuide || DEFAULT_POETRY_CONTINUITY_GUIDE);
     setPoetryScenes(Array.isArray(project.scenes) ? project.scenes : []);
     setPoetrySceneGenerationStates({});
     setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
-    setPoetryStatus(project.scenes?.length ? "已恢复上次进度，可以继续编辑或生成。" : "已打开诗词项目，可以继续分析。");
+    setPoetryStatus(project.analysis
+      ? (project.scenes?.length ? "已恢复上次进度，可以继续编辑或生成。" : "已打开诗词项目，可以继续分析。")
+      : project.scenes?.length
+        ? "这是旧项目，尚未保存完整意境分析；请点击“重新分析诗词意境”补齐译文、背景和赏析栏目。"
+        : "已打开诗词项目，可以继续分析。");
     setPoetryProgress("");
     setPoetryProjectStatus("已加载 · " + (project.updatedAt ? new Date(project.updatedAt).toLocaleString("zh-CN") : ""));
   }
@@ -395,6 +460,8 @@ function App() {
       promptSupplement: poetryPromptSupplement.trim(),
       analysis: poetryAnalysis,
       styleGuide: poetryStyleGuide,
+      characterBible: poetryCharacterBible,
+      continuityGuide: poetryContinuityGuide,
       scenes: poetryScenes,
       ...overrides
     };
@@ -433,6 +500,8 @@ function App() {
     setPoetryAnalysis(null);
     setPoetryScenes([]);
     setPoetryStyleGuide("");
+    setPoetryCharacterBible("");
+    setPoetryContinuityGuide("");
     setPoetryPromptSupplement("");
     setPoetrySceneGenerationStates({});
     setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
@@ -576,6 +645,7 @@ function App() {
   }, [loading, requestStartedAt]);
 
   const selectedSize = useMemo(() => SIZES.find((item) => item.value === size)!, [size]);
+  const poetrySceneRecommendation = useMemo(() => getPoetrySceneRecommendation(poemText, poetryAnalysis), [poemText, poetryAnalysis]);
   const dailyPrompts = useMemo(
     () => getDailyPromptHotlist(new Date(), 6, hotlistRefreshIndex, extraPrompts),
     [extraPrompts, hotlistRefreshIndex]
@@ -605,7 +675,7 @@ function App() {
         poetrySaveTimer.current = null;
       }
     };
-  }, [activePoetryProjectId, poetryOpen, poemText, poetrySceneCount, size, poetryPromptSupplement, poetryAnalysis, poetryStyleGuide, poetryScenes, poetryLoading, poetrySingleGenerating, poetryBatchGenerating]);
+  }, [activePoetryProjectId, poetryOpen, poemText, poetrySceneCount, size, poetryPromptSupplement, poetryAnalysis, poetryStyleGuide, poetryCharacterBible, poetryContinuityGuide, poetryScenes, poetryLoading, poetrySingleGenerating, poetryBatchGenerating]);
 
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
@@ -1067,6 +1137,8 @@ function App() {
     setPoetryAnalysis(null);
     setPoetryScenes([]);
     setPoetryStyleGuide("");
+    setPoetryCharacterBible("");
+    setPoetryContinuityGuide("");
     setPoetryProgress("");
     setPoetryStatus("正在分析诗词的时空、意象、典故和情绪变化...");
     setActivityStatus("正在理解诗词意境，完成后可先检查和修改分析结果。");
@@ -1080,8 +1152,8 @@ function App() {
       if (!response.ok) throw new Error(await readApiError(response));
       const data = await response.json();
       if (!data.analysis || !Array.isArray(data.analysis.lineReadings)) throw new Error("没有得到完整的诗词意境分析。");
-      setPoetryAnalysis(data.analysis);
-      await savePoetryProject({ forceCreate: !activePoetryProjectId, overrides: { analysis: data.analysis, scenes: [], styleGuide: "" } });
+      setPoetryAnalysis(hydratePoetryAnalysis(data.analysis));
+      await savePoetryProject({ forceCreate: !activePoetryProjectId, overrides: { analysis: data.analysis, scenes: [], styleGuide: "", characterBible: "", continuityGuide: "" } });
       setPoetryStatus("意境分析已完成。请检查和修改内容，确认后再生成分镜提示词。");
       setActivityStatus("诗词意境分析完成，等待确认后生成分镜。");
       setActivityTone("success");
@@ -1101,6 +1173,8 @@ function App() {
     setPoetryAnalysis(null);
     setPoetryScenes([]);
     setPoetryStyleGuide("");
+    setPoetryCharacterBible("");
+    setPoetryContinuityGuide("");
     setPoetryProgress("");
     setPoetryFailedStage(null);
     setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
@@ -1120,6 +1194,8 @@ function App() {
     setPoetrySceneGenerationStates({});
     setPoetryScenes([]);
     setPoetryStyleGuide("");
+    setPoetryCharacterBible("");
+    setPoetryContinuityGuide("");
     setPoetryProgress("");
     setPoetryStatus("正在根据确认后的意境分析生成分镜提示词...");
     setActivityStatus("正在把确认后的诗意分析转换为连续画面提示词。");
@@ -1135,7 +1211,11 @@ function App() {
       if (!Array.isArray(data.scenes) || !data.scenes.length) throw new Error("没有得到可用的诗词画面段落。");
       setPoetryScenes(data.scenes);
       setPoetryStyleGuide(typeof data.styleGuide === "string" ? data.styleGuide : "");
-      await savePoetryProject({ overrides: { analysis: poetryAnalysis, scenes: data.scenes, styleGuide: typeof data.styleGuide === "string" ? data.styleGuide : "" } });
+      const characterBible = typeof data.characterBible === "string" && data.characterBible.trim() ? data.characterBible : DEFAULT_POETRY_CHARACTER_BIBLE;
+      const continuityGuide = typeof data.continuityGuide === "string" && data.continuityGuide.trim() ? data.continuityGuide : DEFAULT_POETRY_CONTINUITY_GUIDE;
+      setPoetryCharacterBible(characterBible);
+      setPoetryContinuityGuide(continuityGuide);
+      await savePoetryProject({ overrides: { analysis: poetryAnalysis, scenes: data.scenes, styleGuide: typeof data.styleGuide === "string" ? data.styleGuide : "", characterBible, continuityGuide } });
       setPoetryStatus("已生成 " + data.scenes.length + " 段画面提示词，可以编辑后逐段或批量出图。");
       setActivityStatus("诗词分镜提示词已生成并可继续编辑。");
       setActivityTone("success");
@@ -1201,8 +1281,25 @@ function App() {
     return collection;
   }
 
+  function buildPoetryScenePrompt(scene: PoetryScene) {
+    const previousScenes = poetryScenes
+      .filter((item) => item.sceneOrder < scene.sceneOrder)
+      .sort((a, b) => a.sceneOrder - b.sceneOrder);
+    const previousPrompt = previousScenes.length
+      ? "前序分镜提示词（必须继承其中的人物外貌、服装、发型、道具、时代、画风和空间关系，只允许按当前诗句推进动作、天气与光线）：\n" + previousScenes.map((item) => "第" + item.sceneOrder + "段《" + item.title + "》：" + item.prompt.slice(0, 3600)).join("\n")
+      : "这是首段画面，请建立并固定角色与视觉锚点，供后续分镜继承。";
+    return [
+      poetryStyleGuide,
+      poetryCharacterBible,
+      poetryContinuityGuide,
+      poetryPromptSupplement.trim(),
+      previousPrompt,
+      "当前分镜提示词：" + scene.prompt
+    ].filter(Boolean).join("\n");
+  }
+
   async function generatePoetrySceneImage(scene: PoetryScene, collection: PoetryCollection) {
-    const promptText = [poetryStyleGuide, poetryPromptSupplement.trim(), scene.prompt].filter(Boolean).join(" ");
+    const promptText = buildPoetryScenePrompt(scene);
     const node = collection.nodesByOrder.get(scene.sceneOrder);
     if (!node) throw new Error("诗词画面节点未创建，请重试。");
     const response = await fetch("/api/images/generate", {
@@ -1972,11 +2069,13 @@ function App() {
                   <select id="poetry-scene-count" value={poetrySceneCount} onChange={(event) => setPoetrySceneCount(Number(event.target.value))}>
                     {[3, 4, 5, 6, 7, 8].map((count) => <option key={count} value={count}>{count} 段{count === 6 ? "（默认）" : ""}</option>)}
                   </select>
+                  <span className="poetry-scene-recommendation" role="status">推荐 {poetrySceneRecommendation.count} 段：{poetrySceneRecommendation.reason}</span>
+                  {poetrySceneCount !== poetrySceneRecommendation.count && <button type="button" className="poetry-recommendation-button" onClick={() => setPoetrySceneCount(poetrySceneRecommendation.count)} title="采用推荐的分段数量"><CheckCircle2 size={13} />采用推荐</button>}
                   <label htmlFor="poetry-image-size">图片比例</label>
                   <select id="poetry-image-size" value={size} onChange={(event) => setSize(event.target.value)}>
                     {SIZES.map((option) => <option key={option.value} value={option.value}>{option.name} · {option.detail}</option>)}
                   </select>
-                  <button type="button" onClick={() => void analyzePoem()} disabled={poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryLoadingAction === "analysis" ? <LoaderCircle className="spin" size={14} /> : <BookOpen size={14} />}{poetryLoadingAction === "analysis" ? "正在分析" : "分析诗词意境"}</button>
+                  <button type="button" onClick={() => void analyzePoem()} disabled={poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryLoadingAction === "analysis" ? <LoaderCircle className="spin" size={14} /> : <BookOpen size={14} />}{poetryLoadingAction === "analysis" ? "正在分析" : poetryAnalysis ? "重新分析诗词意境" : "分析诗词意境"}</button>
                   <button type="button" className="primary" onClick={() => void generatePoetryStoryboard()} disabled={!poetryAnalysis || poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryLoadingAction === "storyboard" ? <LoaderCircle className="spin" size={14} /> : <WandSparkles size={14} />}{poetryLoadingAction === "storyboard" ? "正在生成分镜" : "生成分镜提示词"}</button>
                   <button type="button" onClick={() => void generateAllPoetryScenes()} disabled={!poetryScenes.length || poetryLoading || poetrySingleGenerating || poetryBatchGenerating}>{poetryBatchGenerating ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}{poetryBatchGenerating ? "正在批量生成" : "批量生成全部"}</button>
                 </div>
@@ -2010,7 +2109,7 @@ function App() {
                 <section className="poetry-analysis" aria-labelledby="poetry-analysis-heading">
                   <div className="poetry-analysis-heading">
                     <div><strong id="poetry-analysis-heading">意境分析</strong><small>可直接修改，分镜会以这里确认的内容为准</small></div>
-                    <span>{poetryAnalysis.lineReadings.length} 段逐句理解</span>
+                    <span>{(poetryAnalysis.lineReadings || []).length} 段逐句理解</span>
                   </div>
                   <div className="poetry-analysis-meta">
                     <label>题目<input value={poetryAnalysis.title} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, title: event.target.value } : analysis)} /></label>
@@ -2018,15 +2117,34 @@ function App() {
                     <label>朝代<input value={poetryAnalysis.dynasty} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, dynasty: event.target.value } : analysis)} /></label>
                   </div>
                   <div className="poetry-analysis-grid">
+                    <label className="poetry-analysis-field">体裁<input value={poetryAnalysis.genre} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, genre: event.target.value } : analysis)} placeholder="如：七言律诗、词" /></label>
+                    <label className="poetry-analysis-field wide">标签<input value={(poetryAnalysis.tags || []).join("，")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, tags: event.target.value.split(/[,，、]/u).map((item) => item.trim()).filter(Boolean) } : analysis)} placeholder="用逗号分隔，如：写景、怀古、抒情" /></label>
                     <label className="poetry-analysis-field">主题<textarea value={poetryAnalysis.theme} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, theme: event.target.value } : analysis)} rows={2} /></label>
                     <label className="poetry-analysis-field wide">整体解读<textarea value={poetryAnalysis.overview} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, overview: event.target.value } : analysis)} rows={4} /></label>
+                    <label className="poetry-analysis-field wide">译文<textarea value={poetryAnalysis.translation} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, translation: event.target.value } : analysis)} rows={4} /></label>
+                    <label className="poetry-analysis-field wide">创作背景<textarea value={poetryAnalysis.creationBackground} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, creationBackground: event.target.value } : analysis)} rows={3} /></label>
+                    <label className="poetry-analysis-field wide">历史语境<textarea value={poetryAnalysis.historicalContext} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, historicalContext: event.target.value } : analysis)} rows={3} /></label>
                     <label className="poetry-analysis-field">时空背景<textarea value={poetryAnalysis.timeAndPlace} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, timeAndPlace: event.target.value } : analysis)} rows={3} /></label>
                     <label className="poetry-analysis-field">情绪变化<textarea value={poetryAnalysis.emotionalArc} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, emotionalArc: event.target.value } : analysis)} rows={3} /></label>
-                    <label className="poetry-analysis-field wide">核心意象<input value={poetryAnalysis.coreImagery.join("，")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, coreImagery: event.target.value.split(/[,，、]/u).map((item) => item.trim()).filter(Boolean) } : analysis)} placeholder="用逗号分隔" /></label>
+                    <label className="poetry-analysis-field wide">结构分析<textarea value={poetryAnalysis.structureAnalysis} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, structureAnalysis: event.target.value } : analysis)} rows={3} /></label>
+                    <label className="poetry-analysis-field wide">表现手法<textarea value={poetryAnalysis.literaryDevices} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, literaryDevices: event.target.value } : analysis)} rows={3} /></label>
+                    <label className="poetry-analysis-field wide">整体赏析<textarea value={poetryAnalysis.appreciation} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, appreciation: event.target.value } : analysis)} rows={4} /></label>
+                    <label className="poetry-analysis-field wide">核心意象<input value={(poetryAnalysis.coreImagery || []).join("，")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, coreImagery: event.target.value.split(/[,，、]/u).map((item) => item.trim()).filter(Boolean) } : analysis)} placeholder="用逗号分隔" /></label>
+                  </div>
+                  <div className="poetry-sensory-analysis">
+                    <strong>感官与镜头线索</strong>
+                    <label>视觉<textarea value={poetryAnalysis.sensoryDetails?.visual || ""} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, sensoryDetails: { ...DEFAULT_POETRY_ANALYSIS.sensoryDetails, ...(analysis.sensoryDetails || {}), visual: event.target.value } } : analysis)} rows={2} /></label>
+                    <label>听觉<textarea value={poetryAnalysis.sensoryDetails?.auditory || ""} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, sensoryDetails: { ...DEFAULT_POETRY_ANALYSIS.sensoryDetails, ...(analysis.sensoryDetails || {}), auditory: event.target.value } } : analysis)} rows={2} /></label>
+                    <label>空间<textarea value={poetryAnalysis.sensoryDetails?.spatial || ""} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, sensoryDetails: { ...DEFAULT_POETRY_ANALYSIS.sensoryDetails, ...(analysis.sensoryDetails || {}), spatial: event.target.value } } : analysis)} rows={2} /></label>
+                    <label>时间与光线<textarea value={poetryAnalysis.sensoryDetails?.temporal || ""} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, sensoryDetails: { ...DEFAULT_POETRY_ANALYSIS.sensoryDetails, ...(analysis.sensoryDetails || {}), temporal: event.target.value } } : analysis)} rows={2} /></label>
+                  </div>
+                  <div className="poetry-annotations">
+                    <strong>重点注释</strong>
+                    {(poetryAnalysis.annotations || []).map((annotation, index) => <div className="poetry-annotation" key={index}><input aria-label={"注释词语 " + (index + 1)} value={annotation.term} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, annotations: (analysis.annotations || []).map((item, itemIndex) => itemIndex === index ? { ...item, term: event.target.value } : item) } : analysis)} /><textarea aria-label={annotation.term + "注释"} value={annotation.explanation} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, annotations: (analysis.annotations || []).map((item, itemIndex) => itemIndex === index ? { ...item, explanation: event.target.value } : item) } : analysis)} rows={2} /></div>)}
                   </div>
                   <div className="poetry-line-readings">
                     <strong>逐句理解</strong>
-                    {poetryAnalysis.lineReadings.map((reading, index) => (
+                    {(poetryAnalysis.lineReadings || []).map((reading, index) => (
                       <div className="poetry-line-reading" key={index}>
                         <span>{String(index + 1).padStart(2, "0")}</span>
                         <label>原句<input value={reading.sourceLine} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, lineReadings: analysis.lineReadings.map((item, itemIndex) => itemIndex === index ? { ...item, sourceLine: event.target.value } : item) } : analysis)} /></label>
@@ -2038,18 +2156,22 @@ function App() {
                   </div>
                   <div className="poetry-analysis-notes">
                     <strong>典故与存疑</strong>
-                    {poetryAnalysis.allusions.map((allusion, index) => (
+                    {(poetryAnalysis.allusions || []).map((allusion, index) => (
                       <div className="poetry-allusion" key={index}>
                         <input aria-label={"典故 " + (index + 1)} value={allusion.sourceText} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, allusions: analysis.allusions.map((item, itemIndex) => itemIndex === index ? { ...item, sourceText: event.target.value } : item) } : analysis)} />
                         <textarea aria-label={allusion.sourceText + "解释"} value={allusion.explanation} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, allusions: analysis.allusions.map((item, itemIndex) => itemIndex === index ? { ...item, explanation: event.target.value } : item) } : analysis)} rows={2} />
                         <select aria-label={allusion.sourceText + "可信度"} value={allusion.confidence} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, allusions: analysis.allusions.map((item, itemIndex) => itemIndex === index ? { ...item, confidence: event.target.value as PoetryAllusion["confidence"] } : item) } : analysis)}><option value="high">高可信</option><option value="medium">中可信</option><option value="low">低可信</option></select>
                       </div>
                     ))}
-                    <label>存疑点<textarea value={poetryAnalysis.uncertainties.join("\n")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, uncertainties: event.target.value.split(/\r?\n/u).map((item) => item.trim()).filter(Boolean) } : analysis)} rows={3} /></label>
+                    <label>存疑点<textarea value={(poetryAnalysis.uncertainties || []).join("\n")} onChange={(event) => setPoetryAnalysis((analysis) => analysis ? { ...analysis, uncertainties: event.target.value.split(/\r?\n/u).map((item) => item.trim()).filter(Boolean) } : analysis)} rows={3} /></label>
                   </div>
                 </section>
               )}
-              {poetryStyleGuide && <p className="poetry-style-guide"><strong>统一视觉：</strong>{poetryStyleGuide}</p>}
+              {(poetryStyleGuide || poetryCharacterBible || poetryContinuityGuide) && <div className="poetry-continuity-panel">
+                <div className="poetry-style-guide"><strong>统一视觉：</strong>{poetryStyleGuide || "未设置"}</div>
+                <label><span>角色设定锁</span><textarea aria-label="角色设定锁" value={poetryCharacterBible} onChange={(event) => setPoetryCharacterBible(event.target.value)} rows={3} placeholder="固定人物外貌、服装、发型、配饰和道具" /></label>
+                <label><span>连续性规则</span><textarea aria-label="连续性规则" value={poetryContinuityGuide} onChange={(event) => setPoetryContinuityGuide(event.target.value)} rows={3} placeholder="规定后续画面必须继承的设定" /></label>
+              </div>}
               {poetryScenes.length > 0 && <div className="poetry-scene-list">
                 {poetryScenes.map((scene, index) => {
                   const generationState = poetrySceneGenerationStates[scene.sceneOrder];
@@ -2072,6 +2194,7 @@ function App() {
                 })}
               </div>}
               {!poetryAnalysis && !poetryLoading && <p className="poetry-empty">输入诗词后点击“分析诗词意境”。</p>}
+              {!poetryAnalysis && poetryScenes.length > 0 && !poetryLoading && <p className="poetry-legacy-analysis-note">当前项目只有旧版分镜提示词。点击“分析诗词意境”后，会补齐译文、注释、创作背景、结构分析、表现手法和赏析等栏目。</p>}
               {poetryAnalysis && !poetryScenes.length && !poetryLoading && <p className="poetry-empty">检查上方分析内容，确认后点击“生成分镜提示词”。</p>}
             </div>
           </section>
