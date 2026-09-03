@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import sharp from "sharp";
 import test from "node:test";
 import { getDesktopAppDirectory } from "./desktop-path.mjs";
 import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-image-store.mjs";
@@ -69,4 +70,19 @@ test("accepts only server-generated PNG file names", () => {
   assert.equal(isSafeGeneratedImageFileName("../.env"), false);
   assert.equal(isSafeGeneratedImageFileName("..%2F.env"), false);
   assert.equal(isSafeGeneratedImageFileName("source.jpg"), false);
+});
+
+test("normalizes provider output to the requested poetry image size", async () => {
+  await withTemporaryDirectory(async (outputDirectory) => {
+    const source = await sharp({ create: { width: 1600, height: 900, channels: 4, background: "#334455" } }).png().toBuffer();
+    const result = await saveProviderImage({
+      item: { b64_json: source.toString("base64") },
+      outputDirectory,
+      now: new Date("2026-09-03T08:30:15.000Z"),
+      title: "横屏画面",
+      size: "864x1536"
+    });
+    const metadata = await sharp(path.join(outputDirectory, result.relativePath)).metadata();
+    assert.deepEqual({ width: metadata.width, height: metadata.height }, { width: 864, height: 1536 });
+  });
 });

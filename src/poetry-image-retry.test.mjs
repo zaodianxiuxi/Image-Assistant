@@ -30,5 +30,8 @@ test("does not retry permanent image errors", async () => {
   }, { sleep: async () => {} }), /提示词无效/);
   assert.equal(attempts, 1);
   assert.equal(isRetryableImageError(new ImageRequestError(429, "限流")), true);
+  assert.equal(isRetryableImageError(new ImageRequestError(500, "服务异常")), true);
+  assert.equal(isRetryableImageError(new ImageRequestError(524, "网关超时")), true);
+  assert.equal(isRetryableImageError(Object.assign(new Error("网络断开"), { name: "TypeError" })), true);
   assert.equal(isRetryableImageError(new ImageRequestError(401, "密钥无效")), false);
 });

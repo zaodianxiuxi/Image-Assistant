@@ -8,7 +8,8 @@ export class ImageRequestError extends Error {
 
 export function isRetryableImageError(error) {
   const status = Number(error?.status);
-  return status === 408 || status === 425 || status === 429 || status === 502 || status === 503 || status === 504;
+  if (!status && (error?.name === "TypeError" || error?.name === "AbortError")) return true;
+  return status === 408 || status === 425 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || status === 524;
 }
 
 export async function retryPoetryImageRequest(operation, options = {}) {

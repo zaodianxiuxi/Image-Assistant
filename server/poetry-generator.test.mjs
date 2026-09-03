@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzePoetry, generatePoetryScenes, validatePoetryAnalysis } from "./poetry-generator.mjs";
+import { analyzePoetry, generatePoetryScenes, validatePoetryAnalysis, validatePoetryScenes } from "./poetry-generator.mjs";
 
 const VALID_ANALYSIS = {
   title: "江雪",
@@ -85,6 +85,11 @@ test("validates confirmed poetry analysis", () => {
   const partial = validatePoetryAnalysis({ title: "江雪", overview: "天地空寂。", lineReadings: [] });
   assert.equal(partial.overview, "天地空寂。");
   assert.deepEqual(partial.tags, []);
+});
+
+test("trims an occasional extra storyboard scene instead of failing", () => {
+  assert.equal(validatePoetryScenes(scenes(9), 8).length, 8);
+  assert.throws(() => validatePoetryScenes(scenes(2), 6), /返回了 2 个画面段落/);
 });
 
 test("requires a poem and text model", async () => {

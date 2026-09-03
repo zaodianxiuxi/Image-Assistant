@@ -131,6 +131,7 @@ const SIZES = [
 const MAX_REFERENCE_IMAGES = 10;
 const STORYBOARD_STYLE_PREFIX = "写实、现实质感的东方志怪电影摄影风格，古代中国环境，可信的人物比例和材质，统一角色外貌、服装、时代与光影，不要卡通、插画或现代物品。";
 const DEFAULT_POETRY_STYLE_GUIDE = "整体采用唐代长安旧都的历史氛围，统一为黄昏到入夜前的冷暖交替色调，人物为同一位中年文士，青色圆领长袍、黑色幞头、浅灰旧氅衣，始终以电影感写实水墨风呈现，强调高城、渭水、荒苑、秋叶、风雨与远眺的连续空间关系。";
+const POETRY_IMAGE_QUALITY_GUIDE = "画质与曝光要求：保持诗意氛围但整体曝光充足、主体面部和服装细节清晰可见，阴影保留层次，不要欠曝、死黑或灰暗糊成一片；画面干净锐利、低噪点、低数字噪声，仅保留轻微细腻且不影响细节的胶片颗粒，避免重颗粒、脏污、色带和低清晰度。";
 const DEFAULT_POETRY_CHARACTER_BIBLE = "固定主角：同一位中年男性文士，面容清瘦、眉骨分明、肤色偏白、黑色长发束于黑色幞头，体型修长。固定服装：青色圆领长袍，外罩浅灰旧氅衣，深色腰带与布靴；固定配饰与道具：木簪、旧竹简和木栏，不可改变年龄、脸型、发型、服装颜色材质款式、配饰、道具和唐代身份。";
 const DEFAULT_POETRY_CONTINUITY_GUIDE = "连续性锁定：所有分镜使用同一位中年文士、同一套青色圆领长袍与浅灰旧氅衣、黑色幞头、同一时代和写实电影感水墨摄影。后续只允许风雨、光线、姿态和场景位置随诗句推进而变化，禁止换衣服、换发型、改变年龄体型、替换固定道具或切换画风、色彩和镜头质感。";
 const DEFAULT_POETRY_ANALYSIS: PoetryAnalysis = {
@@ -213,12 +214,12 @@ function getPoetrySceneRecommendation(poem: string, analysis: PoetryAnalysis | n
   const semanticCount = analysis?.lineReadings.length || poem.split(/\r?\n/u)
     .map((line) => line.trim())
     .filter((line) => line && /[，。；！？、]$/u.test(line) && !/^作者|^朝代/u.test(line)).length;
-  const count = semanticCount <= 4 ? 4 : semanticCount <= 6 ? 6 : Math.min(8, semanticCount);
-  const reason = semanticCount <= 4
-    ? "适合用 4 段呈现起承转合"
+  const count = semanticCount <= 3 ? 4 : semanticCount <= 6 ? 6 : 8;
+  const reason = semanticCount <= 3
+    ? "内容较短，适合用 4 段呈现起承转合"
     : semanticCount <= 6
       ? "适合用 6 段展开意象和情绪转折"
-      : "诗句较多，建议控制在 8 段以内";
+      : "诗句较多，建议用 8 段完整展开画面";
   return { count, reason };
 }
 
@@ -235,6 +236,17 @@ function hydratePoetryAnalysis(value: Partial<PoetryAnalysis> | null | undefined
     allusions: Array.isArray(value.allusions) ? value.allusions : [],
     uncertainties: Array.isArray(value.uncertainties) ? value.uncertainties : []
   };
+}
+
+function shouldCreateNewPoetryProject(project: PoetryProject | undefined, analysis: PoetryAnalysis) {
+  if (!project) return true;
+  const normalizeIdentity = (value: string | undefined) => (value || "").replace(/[《》\s]/gu, "").toLocaleLowerCase("zh-CN");
+  const currentTitle = normalizeIdentity(project.title);
+  const analyzedTitle = normalizeIdentity(analysis.title);
+  if (currentTitle && analyzedTitle && currentTitle !== analyzedTitle) return true;
+  const currentAuthor = normalizeIdentity(project.analysis?.author);
+  const analyzedAuthor = normalizeIdentity(analysis.author);
+  return Boolean(currentAuthor && analyzedAuthor && currentAuthor !== analyzedAuthor);
 }
 
 async function readApiError(response: Response) {
@@ -470,7 +482,7 @@ function App() {
   async function savePoetryProject(options: { silent?: boolean; forceCreate?: boolean; overrides?: Partial<Omit<PoetryProject, "id" | "seriesId" | "createdAt" | "updatedAt">> } = {}) {
     const payload = poetryProjectPayload(options.overrides);
     if (!payload.poemText) return null;
-    if (poetryProjectSaving) return activePoetryProjectId;
+    if (poetryProjectSaving) return poetryProjects.find((project) => project.id === activePoetryProjectId) || null;
     setPoetryProjectSaving(true);
     try {
       const updating = activePoetryProjectId && !options.forceCreate;
@@ -485,7 +497,7 @@ function App() {
       setActivePoetryProjectId(project.id);
       setPoetryProjects((projects) => [project, ...projects.filter((item) => item.id !== project.id)]);
       setPoetryProjectStatus("已保存 · " + new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }));
-      return project.id;
+      return project;
     } catch (caught) {
       if (!options.silent) setPoetryProjectStatus(caught instanceof Error ? caught.message : "保存诗词项目失败。");
       return null;
@@ -663,7 +675,7 @@ function App() {
   }, [groupedHistory, historyLoading]);
 
   useEffect(() => {
-    if (!activePoetryProjectId || !poetryOpen || poetryLoading || poetrySingleGenerating || poetryBatchGenerating || !poemText.trim()) return;
+    if (!activePoetryProjectId || !poetryOpen || !poetryAnalysis || poetryLoading || poetrySingleGenerating || poetryBatchGenerating || !poemText.trim()) return;
     if (poetrySaveTimer.current !== null) window.clearTimeout(poetrySaveTimer.current);
     poetrySaveTimer.current = window.setTimeout(() => {
       poetrySaveTimer.current = null;
@@ -1152,8 +1164,22 @@ function App() {
       if (!response.ok) throw new Error(await readApiError(response));
       const data = await response.json();
       if (!data.analysis || !Array.isArray(data.analysis.lineReadings)) throw new Error("没有得到完整的诗词意境分析。");
-      setPoetryAnalysis(hydratePoetryAnalysis(data.analysis));
-      await savePoetryProject({ forceCreate: !activePoetryProjectId, overrides: { analysis: data.analysis, scenes: [], styleGuide: "", characterBible: "", continuityGuide: "" } });
+      const nextAnalysis = hydratePoetryAnalysis(data.analysis);
+      if (!nextAnalysis) throw new Error("没有得到可用的诗词意境分析。");
+      const activeProject = poetryProjects.find((project) => project.id === activePoetryProjectId);
+      const forceCreate = shouldCreateNewPoetryProject(activeProject, nextAnalysis);
+      setPoetryAnalysis(nextAnalysis);
+      await savePoetryProject({
+        forceCreate,
+        overrides: {
+          title: nextAnalysis.title || getPoetryCollectionName(poemText),
+          analysis: nextAnalysis,
+          scenes: [],
+          styleGuide: "",
+          characterBible: "",
+          continuityGuide: ""
+        }
+      });
       setPoetryStatus("意境分析已完成。请检查和修改内容，确认后再生成分镜提示词。");
       setActivityStatus("诗词意境分析完成，等待确认后生成分镜。");
       setActivityTone("success");
@@ -1179,7 +1205,7 @@ function App() {
     setPoetryFailedStage(null);
     setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
     setPoetrySceneGenerationStates({});
-    setPoetryStatus(value.trim() ? "诗词原文已修改，请重新分析意境。" : "");
+    setPoetryStatus(value.trim() ? "诗词原文已修改，请重新分析意境；如果题目或作者不同，会另存为新的独立合集。" : "");
   }
 
   async function generatePoetryStoryboard() {
@@ -1231,35 +1257,25 @@ function App() {
   }
 
   async function ensurePoetryCollection() {
-    await savePoetryProject({ silent: true });
-    const collectionKey = poemText.trim();
+    const savedProject = await savePoetryProject({ silent: true });
+    const project = savedProject || poetryProjects.find((item) => item.id === activePoetryProjectId);
+    if (!project?.seriesId) throw new Error("诗词项目尚未绑定独立合集，请先保存项目后重试。");
+    const collectionKey = "series:" + project.seriesId;
     let collection = poetryCollections.current.get(collectionKey);
 
     if (!collection) {
-      const name = getPoetryCollectionName(poemText);
       const seriesResponse = await fetch("/api/series");
       if (!seriesResponse.ok) throw new Error(await readApiError(seriesResponse));
       const seriesData = await seriesResponse.json();
-      const existingSeries = Array.isArray(seriesData.series) ? seriesData.series.find((item: SeriesRecord) => item.name === name) : null;
-      let series: SeriesRecord | null = existingSeries;
-
-      if (!series) {
-        const createSeriesResponse = await fetch("/api/series", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description: "诗词意境创作合集" })
-        });
-        if (!createSeriesResponse.ok) throw new Error(await readApiError(createSeriesResponse));
-        const createdSeriesData = await createSeriesResponse.json();
-        series = createdSeriesData.series;
-      }
-
-      if (!series) throw new Error("无法创建诗词合集。");
+      const series = Array.isArray(seriesData.series)
+        ? seriesData.series.find((item: SeriesRecord) => Number(item.id) === Number(project.seriesId))
+        : null;
+      if (!series) throw new Error("诗词项目绑定的独立合集不存在，请重新保存项目。");
       const nodesResponse = await fetch("/api/series/" + series.id + "/nodes");
       if (!nodesResponse.ok) throw new Error(await readApiError(nodesResponse));
       const nodesData = await nodesResponse.json();
       collection = {
-        name,
+        name: project.title,
         series,
         nodesByOrder: new Map<number, SeriesNode>((Array.isArray(nodesData.nodes) ? nodesData.nodes : []).map((node: SeriesNode) => [node.node_order, node]))
       };
@@ -1286,27 +1302,59 @@ function App() {
       .filter((item) => item.sceneOrder < scene.sceneOrder)
       .sort((a, b) => a.sceneOrder - b.sceneOrder);
     const previousPrompt = previousScenes.length
-      ? "前序分镜提示词（必须继承其中的人物外貌、服装、发型、道具、时代、画风和空间关系，只允许按当前诗句推进动作、天气与光线）：\n" + previousScenes.map((item) => "第" + item.sceneOrder + "段《" + item.title + "》：" + item.prompt.slice(0, 3600)).join("\n")
+      ? "前序分镜提示词（必须继承其中的人物外貌、服装、发型、道具、时代、画风和空间关系，只允许按当前诗句推进动作、天气与光线）：\n" + previousScenes.map((item) => "第" + item.sceneOrder + "段《" + item.title + "》：" + item.prompt.slice(0, 1200)).join("\n").slice(0, 9000)
       : "这是首段画面，请建立并固定角色与视觉锚点，供后续分镜继承。";
     return [
       poetryStyleGuide,
       poetryCharacterBible,
       poetryContinuityGuide,
       poetryPromptSupplement.trim(),
+      POETRY_IMAGE_QUALITY_GUIDE,
       previousPrompt,
       "当前分镜提示词：" + scene.prompt
     ].filter(Boolean).join("\n");
   }
 
-  async function generatePoetrySceneImage(scene: PoetryScene, collection: PoetryCollection) {
-    const promptText = buildPoetryScenePrompt(scene);
+  function findPreviousPoetryResult(scene: PoetryScene, collection: PoetryCollection) {
+    return history
+      .filter((item) => item.seriesId === collection.series.id && Number(item.nodeOrder) < scene.sceneOrder)
+      .sort((a, b) => Number(b.nodeOrder || 0) - Number(a.nodeOrder || 0) || b.createdAt.getTime() - a.createdAt.getTime())[0] || null;
+  }
+
+  async function generatePoetrySceneImage(scene: PoetryScene, collection: PoetryCollection, previousResult: Result | null = null) {
+    const basePrompt = buildPoetryScenePrompt(scene);
+    const promptText = previousResult
+      ? basePrompt + "\n以上一段已生成图片作为唯一视觉参考，必须保持人物身份、脸型、发型、服装、材质、画风、色彩、镜头质感和空间连续性，只根据当前诗句改变动作、天气、光线或景物。"
+      : basePrompt;
     const node = collection.nodesByOrder.get(scene.sceneOrder);
     if (!node) throw new Error("诗词画面节点未创建，请重试。");
-    const response = await fetch("/api/images/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: promptText, size, title: scene.title, seriesName: collection.name, seriesId: collection.series.id, nodeId: node.id, nodeOrder: node.node_order })
-    });
+    let response: Response;
+    let operation: Mode = "generate";
+    if (previousResult) {
+      const sourceResponse = await fetch(previousResult.src);
+      if (!sourceResponse.ok) throw new Error("无法读取上一段图片，暂时无法保持连续画风。");
+      const sourceBlob = await sourceResponse.blob();
+      const form = new FormData();
+      form.append("prompt", promptText);
+      form.append("size", size);
+      form.append("title", scene.title);
+      form.append("seriesName", collection.name);
+      form.append("seriesId", String(collection.series.id));
+      form.append("nodeId", String(node.id));
+      form.append("nodeOrder", String(node.node_order));
+      if (previousResult.versionGroupId) form.append("versionGroupId", String(previousResult.versionGroupId));
+      if (previousResult.versionId) form.append("parentVersionId", String(previousResult.versionId));
+      if (previousResult.imageRecordId) form.append("sourceImageRecordId", String(previousResult.imageRecordId));
+      form.append("image[]", sourceBlob, previousResult.fileName || ("poetry-" + scene.sceneOrder + ".png"));
+      response = await fetch("/api/images/edit", { method: "POST", body: form });
+      operation = "edit";
+    } else {
+      response = await fetch("/api/images/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: promptText, size, title: scene.title, seriesName: collection.name, seriesId: collection.series.id, nodeId: node.id, nodeOrder: node.node_order })
+      });
+    }
     if (!response.ok) throw new ImageRequestError(response.status, await readApiError(response));
     const data = await response.json();
     const result: Result = {
@@ -1320,20 +1368,20 @@ function App() {
       nodeTitle: node.title,
       nodeOrder: node.node_order,
       prompt: data.revisedPrompt || promptText,
-      kind: "generate",
+      kind: operation,
       createdAt: new Date(),
       versionId: data.versionId || null,
       versionGroupId: data.versionGroupId || null,
       versionNumber: data.versionNumber || null,
-      parentVersionId: data.parentVersionId || null,
-      isDelivery: Boolean(data.isDelivery)
+      isDelivery: Boolean(data.isDelivery),
+      parentVersionId: data.parentVersionId || previousResult?.versionId || null
     };
-    return data.versionId ? result : enrichSessionVersion(result, null);
+    return data.versionId ? result : enrichSessionVersion(result, previousResult);
   }
 
-  async function generatePoetrySceneImageWithRetry(scene: PoetryScene, collection: PoetryCollection, batchPosition?: { current: number; total: number }) {
+  async function generatePoetrySceneImageWithRetry(scene: PoetryScene, collection: PoetryCollection, previousResult: Result | null = null, batchPosition?: { current: number; total: number }) {
     return retryPoetryImageRequest(
-      () => generatePoetrySceneImage(scene, collection),
+      () => generatePoetrySceneImage(scene, collection, previousResult),
       {
         maxAttempts: 3,
         baseDelayMs: 1000,
@@ -1359,7 +1407,7 @@ function App() {
     setActivityTone("working");
     try {
       const collection = await ensurePoetryCollection();
-      const result = await generatePoetrySceneImageWithRetry(scene, collection);
+      const result = await generatePoetrySceneImageWithRetry(scene, collection, findPreviousPoetryResult(scene, collection));
       setCurrent(result);
       setHistory((items) => [result, ...items].slice(0, 60));
       setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "success", message: "图片已生成并保存，可再次生成", attempt: states[scene.sceneOrder]?.attempt || 1 } }));
@@ -1395,6 +1443,7 @@ function App() {
     setActivityTone("working");
     const generated: Result[] = [];
     const failures: string[] = [];
+    let previousResult: Result | null = null;
     try {
       const collection = await ensurePoetryCollection();
       for (const [index, scene] of poetryScenes.entries()) {
@@ -1402,7 +1451,9 @@ function App() {
         setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "running", message: "正在生成第 " + (index + 1) + " 张...", attempt: 1 } }));
         setPoetryProgress("正在生成第 " + scene.sceneOrder + " / " + poetryScenes.length + " 段：" + scene.title);
         try {
-          generated.push(await generatePoetrySceneImageWithRetry(scene, collection, { current: index + 1, total: poetryScenes.length }));
+          const result = await generatePoetrySceneImageWithRetry(scene, collection, previousResult, { current: index + 1, total: poetryScenes.length });
+          generated.push(result);
+          previousResult = result;
           setPoetrySceneGenerationStates((states) => ({ ...states, [scene.sceneOrder]: { status: "success", message: "图片已生成并保存", attempt: states[scene.sceneOrder]?.attempt || 1 } }));
         } catch (caught) {
           const message = caught instanceof Error ? caught.message : "请求失败";
@@ -1423,11 +1474,12 @@ function App() {
       setActivityTone(failures.length ? "error" : "success");
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "批量生成准备失败。";
+      const completed = generated.length + failures.length;
       setPoetryFailedStage("images");
-      setPoetryImageProgress({ status: "error", completed: generated.length + failures.length, total: poetryScenes.length, currentTitle: "" });
-      setPoetryProgress("批量生成中断：" + message);
-      setPoetryStatus("图片生成未能继续，请检查提示信息后重试。");
-      setActivityStatus("诗词画面批量生成中断，请查看错误信息。");
+      setPoetryImageProgress({ status: "error", completed, total: poetryScenes.length, currentTitle: "" });
+      setPoetryProgress("批量生成中断（已完成 " + completed + " / " + poetryScenes.length + " 段）：" + message);
+      setPoetryStatus("图片生成在准备阶段中断，已完成的图片会保留；请修复提示的错误后重试。");
+      setActivityStatus("诗词画面批量生成中断：" + message);
       setActivityTone("error");
     } finally {
       setPoetryBatchGenerating(false);
@@ -1594,6 +1646,17 @@ function App() {
     return `${source}${source.includes("?") ? "&" : "?"}previewRetry=${retry}`;
   }
 
+  async function requestImageWithRetry(operation: () => Promise<Response>, label: string) {
+    return retryPoetryImageRequest(operation, {
+      maxAttempts: 3,
+      baseDelayMs: 1500,
+      onRetry: (retry: { nextAttempt: number; maxAttempts: number; error: Error }) => {
+        setExecutionStage("processing");
+        setActivityStatus(label + "暂时繁忙，正在自动重试 " + retry.nextAttempt + " / " + retry.maxAttempts + "...");
+      }
+    });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!prompt.trim()) {
@@ -1632,7 +1695,9 @@ function App() {
       setActivityStatus(operation === "edit" ? "已开始上传参考图，正在发送请求..." : "已开始发送提示词，正在连接图片服务...");
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       if (operation === "generate") {
-        const request = fetch("/api/images/generate", {
+        setExecutionStage("processing");
+        setActivityStatus("图片模型正在生成，请稍候...");
+        response = await requestImageWithRetry(() => fetch("/api/images/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1647,31 +1712,34 @@ function App() {
             parentVersionId: versionParent?.versionId || undefined,
             sourceImageRecordId: versionParent?.imageRecordId || undefined
           })
-        });
-        setExecutionStage("processing");
-        setActivityStatus("图片模型正在生成，请稍候...");
-        response = await request;
+        }).then(async (result) => {
+          if (!result.ok) throw new ImageRequestError(result.status, await readApiError(result));
+          return result;
+        }), "图片生成");
       } else {
-        const form = new FormData();
-        form.append("prompt", prompt);
-        form.append("size", size);
-        if (versionParent?.nodeTitle || activeNode?.title) form.append("title", versionParent?.nodeTitle || activeNode?.title || "");
-        if (versionParent?.seriesName || activeSeries?.name) form.append("seriesName", versionParent?.seriesName || activeSeries?.name || "");
-        if (versionParent?.seriesId ?? activeSeries?.id) form.append("seriesId", String(versionParent?.seriesId ?? activeSeries?.id));
-        if (versionParent?.nodeId ?? activeNode?.id) form.append("nodeId", String(versionParent?.nodeId ?? activeNode?.id));
-        if (versionParent?.nodeOrder ?? activeNode?.node_order) form.append("nodeOrder", String(versionParent?.nodeOrder ?? activeNode?.node_order));
-        if (versionParent?.versionGroupId) form.append("versionGroupId", String(versionParent.versionGroupId));
-        if (versionParent?.versionId) form.append("parentVersionId", String(versionParent.versionId));
-        if (versionParent?.imageRecordId) form.append("sourceImageRecordId", String(versionParent.imageRecordId));
-        referenceImages.forEach((image) => form.append("image[]", image.file));
-        if (maskFile) form.append("mask", maskFile);
-        const request = fetch("/api/images/edit", { method: "POST", body: form });
         setExecutionStage("processing");
         setActivityStatus("图片模型正在根据参考图生成，请稍候...");
-        response = await request;
+        response = await requestImageWithRetry(() => {
+          const form = new FormData();
+          form.append("prompt", prompt);
+          form.append("size", size);
+          if (versionParent?.nodeTitle || activeNode?.title) form.append("title", versionParent?.nodeTitle || activeNode?.title || "");
+          if (versionParent?.seriesName || activeSeries?.name) form.append("seriesName", versionParent?.seriesName || activeSeries?.name || "");
+          if (versionParent?.seriesId ?? activeSeries?.id) form.append("seriesId", String(versionParent?.seriesId ?? activeSeries?.id));
+          if (versionParent?.nodeId ?? activeNode?.id) form.append("nodeId", String(versionParent?.nodeId ?? activeNode?.id));
+          if (versionParent?.nodeOrder ?? activeNode?.node_order) form.append("nodeOrder", String(versionParent?.nodeOrder ?? activeNode?.node_order));
+          if (versionParent?.versionGroupId) form.append("versionGroupId", String(versionParent.versionGroupId));
+          if (versionParent?.versionId) form.append("parentVersionId", String(versionParent.versionId));
+          if (versionParent?.imageRecordId) form.append("sourceImageRecordId", String(versionParent.imageRecordId));
+          referenceImages.forEach((image) => form.append("image[]", image.file));
+          if (maskFile) form.append("mask", maskFile);
+          return fetch("/api/images/edit", { method: "POST", body: form }).then(async (result) => {
+            if (!result.ok) throw new ImageRequestError(result.status, await readApiError(result));
+            return result;
+          });
+        }, "图片编辑");
       }
 
-      if (!response.ok) throw new Error(await readApiError(response));
       const data = await response.json();
       const result: Result = {
         id: data.databaseId ? "db-" + data.databaseId : crypto.randomUUID(),

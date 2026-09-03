@@ -175,10 +175,13 @@ export function validatePoetryAnalysis(value) {
 }
 
 export function validatePoetryScenes(value, expectedCount) {
-  const scenes = Array.isArray(value) ? value : [];
-  if (scenes.length < 3 || scenes.length > 8) {
-    throw new Error("文本模型需要返回 3 到 8 个诗词画面段落。");
+  const rawScenes = Array.isArray(value) ? value : [];
+  if (rawScenes.length < 3) {
+    throw new Error("文本模型返回了 " + rawScenes.length + " 个画面段落，至少需要 3 段；请重试或降低提示词复杂度。");
   }
+  // Models occasionally add an extra scene despite the requested count. Keep the
+  // first eight valid candidates, then trim again to the user's requested count.
+  const scenes = rawScenes.slice(0, 8);
   const selectedScenes = scenes.length > expectedCount ? scenes.slice(0, expectedCount) : scenes;
   const seenTitles = new Set();
   return selectedScenes.map((item, index) => {

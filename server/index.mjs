@@ -134,7 +134,11 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
       contentType: response.headers.get("content-type"),
       preview: raw.slice(0, 1000)
     });
-    throw new Error(`上游服务返回了无法解析的响应（HTTP ${response.status}）。`);
+    const error = new Error(response.status === 524
+      ? "上游图片服务网关超时（HTTP 524），中转站未能在时限内返回图片。"
+      : `上游服务返回了无法解析的响应（HTTP ${response.status}）。`);
+    error.status = response.status;
+    throw error;
   }
 
   log("provider_response", {
@@ -163,7 +167,8 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
     title: metadata.title,
     prompt: metadata.prompt,
     seriesName: metadata.seriesName,
-    nodeOrder: metadata.nodeOrder
+    nodeOrder: metadata.nodeOrder,
+    size: metadata.size
   });
   let databaseId = null;
   let versionInfo = null;

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 const GENERATED_IMAGE_NAME = /^(?!\.{1,2}$)[^<>:"/\\|?*\u0000-\u001f]{1,160}\.png$/iu;
 
@@ -64,6 +65,26 @@ async function writeUniqueImage(directory, baseName, bytes, seriesNode = false) 
   throw new Error("同名图片过多，无法生成新的文件名。");
 }
 
+const OUTPUT_DIMENSIONS = {
+  "1024x1024": [1024, 1024],
+  "1536x864": [1536, 864],
+  "864x1536": [864, 1536]
+};
+
+async function normalizeImageSize(bytes, size) {
+  const dimensions = OUTPUT_DIMENSIONS[size];
+  if (!dimensions) return bytes;
+  try {
+    return await sharp(bytes)
+      .resize(dimensions[0], dimensions[1], { fit: "cover", position: "centre" })
+      .png()
+      .toBuffer();
+  } catch {
+    // Preserve the upstream bytes for non-image fixtures or unsupported formats.
+    return bytes;
+  }
+}
+
 export async function saveProviderImage({
   item,
   outputDirectory,
@@ -72,13 +93,14 @@ export async function saveProviderImage({
   title,
   prompt,
   seriesName,
-  nodeOrder
+  nodeOrder,
+  size
 }) {
   if (typeof outputDirectory !== "string" || !outputDirectory) {
     throw new Error("未配置本地图片保存目录。");
   }
 
-  const imageBytes = await getImageBytes(item, fetchImpl);
+  const imageBytes = await normalizeImageSize(await getImageBytes(item, fetchImpl), size);
   const dateDirectoryName = formatDate(now);
   const dateDirectory = path.join(outputDirectory, dateDirectoryName);
   const seriesDirectoryName = seriesName ? sanitizeName(seriesName, "未命名系列") : "";
