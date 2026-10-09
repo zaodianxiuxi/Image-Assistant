@@ -37,6 +37,7 @@ import { enrichSessionVersion, markSessionDelivery } from "./image-version-sessi
 import { ImageRequestError, retryPoetryImageRequest } from "./poetry-image-retry.mjs";
 import StyleWorkbench from "./StyleWorkbench";
 import StoryWorkbench from "./StoryWorkbench";
+import CreativeWelcome from "./CreativeWelcome";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -178,7 +179,7 @@ const DEFAULT_POETRY_SCENES: PoetryScene[] = [
 ];
 const THEME_OPTIONS: Array<{ value: Theme; label: string; description: string }> = [
   { value: "light", label: "明亮工作台", description: "清晰、轻快的日常创作界面" },
-  { value: "dark", label: "深色专业", description: "减少长时间看图的亮度干扰" },
+  { value: "dark", label: "深色专业", description: "电影创作室 · 石墨与暖金" },
   { value: "studio", label: "暖灰编辑室", description: "更适合判断图片色彩和质感" }
 ];
 function getInitialTheme(): Theme {
@@ -1830,7 +1831,7 @@ function App() {
       <header className="topbar">
         <a className="brand" href="/" aria-label="Image Assistant 首页">
           <span className="brand-mark"><WandSparkles size={19} /></span>
-          <span>Image Assistant</span>
+          <span>Image Assistant<small className="brand-subtitle">创作工作室</small></span>
         </a>
         <div className="topbar-actions">
           <div className="theme-picker">
@@ -1881,6 +1882,7 @@ function App() {
 
       <section className="workspace" aria-label="图片生成工作台">
         <aside className="control-panel">
+          <div className="control-heading"><span>画面创作</span><small>MAKE SOMETHING NEW</small></div>
           <div className="mode-switch" role="tablist" aria-label="工作模式">
             <button className={mode === "generate" ? "active" : ""} onClick={() => switchMode("generate")} role="tab" aria-selected={mode === "generate"}>
               <Sparkles size={16} /> 生成
@@ -1890,7 +1892,19 @@ function App() {
             </button>
           </div>
 
-          <form onSubmit={submit} className="prompt-form">
+          <div className="control-scroll">
+          <form id="image-prompt-form" onSubmit={submit} className="prompt-form">
+            <div className="field-label-row">
+              <label className="field-label" htmlFor="prompt">描述你的画面</label>
+              <div className="prompt-label-actions">
+                <button className="save-prompt-button" type="button" onClick={saveCurrentPrompt} title="保存到提示词库"><Plus size={13} /> 保存</button>
+              </div>
+            </div>
+            <div className="prompt-box">
+              <textarea id="prompt" value={prompt} onChange={(event) => handlePromptChange(event.target.value)} placeholder={referenceImages.length || mode === "edit" ? "描述希望保留或修改什么，例如：把天空换成黄昏..." : "例如：黄昏的旧车站，一个提着行李的人，停在最后一束光里。温暖胶片质感。"} rows={5} />
+              <span>{prompt.length} / 4000</span>
+            </div>
+
             <div className="upload-stack">
                 <input ref={sourceInput} type="file" accept="image/*" multiple onChange={selectReferenceImages} hidden />
                 {referenceImages.length ? (
@@ -1927,17 +1941,6 @@ function App() {
                 )}
             </div>
 
-            <div className="field-label-row">
-              <label className="field-label" htmlFor="prompt">提示词</label>
-              <div className="prompt-label-actions">
-                <button className="save-prompt-button" type="button" onClick={saveCurrentPrompt} title="保存到提示词库"><Plus size={13} /> 保存</button>
-              </div>
-            </div>
-            <div className="prompt-box">
-              <textarea id="prompt" value={prompt} onChange={(event) => handlePromptChange(event.target.value)} placeholder={referenceImages.length || mode === "edit" ? "描述希望保留或修改什么，例如：把天空换成黄昏..." : "描述你想生成的画面、风格和细节..."} rows={7} />
-              <span>{prompt.length} / 4000</span>
-            </div>
-
             <div className="settings-block">
               <label className="field-label" htmlFor="size">画幅</label>
               <div className="select-wrap">
@@ -1953,10 +1956,6 @@ function App() {
             {error && <p className="form-error" role="alert">{error}</p>}
             {!apiReady && <p className="setup-note"><KeyRound size={15} /> <button className="setup-link" type="button" onClick={openApiSettings}>配置 API Key</button></p>}
 
-            <button className="generate-button" type="submit" disabled={loading}>
-              {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
-              {loading ? "正在生成..." : actionLabel}
-            </button>
           </form>
 
           <section className="prompt-hotlist" aria-label="今日提示词热榜">
@@ -1997,14 +1996,22 @@ function App() {
               ))}
             </div>
           </section>
+          </div>
+          <div className="control-submit">
+            <button className="generate-button" type="submit" form="image-prompt-form" disabled={loading}>
+              {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
+              {loading ? "正在生成..." : actionLabel}
+            </button>
+            <span>让想象，从这里显影</span>
+          </div>
         </aside>
 
         <section className="canvas-panel">
           <div className="canvas-heading">
-            <div><span className="eyebrow">输出</span><h1>{current ? "最新生成结果" : "创作画布"}</h1></div>
+            <div><span className="eyebrow">YOUR CREATIVE SPACE</span><h1>{current ? "最新生成结果" : "今天，想讲一个什么故事？"}</h1></div>
             {current && <DownloadButton src={current.src} filename={current.fileName || "image-assistant.png"} />}
           </div>
-          <div className={`canvas ${current ? "has-result" : ""}`}>
+          <div className={`canvas ${current ? "has-result" : !loading && mode === "generate" && !referenceImages.length ? "is-welcome" : ""}`}>
             {loading ? (
               <div className="loading-state">
                 <span className="loader-ring"><Sparkles size={23} /></span>
@@ -2025,6 +2032,8 @@ function App() {
                   )}
                   <figcaption><span>{current.kind === "generate" ? "生成" : "编辑"} · {formatTime(current.createdAt)}</span><p>{current.prompt}</p></figcaption>
                 </figure>
+            ) : mode === "generate" && !referenceImages.length ? (
+              <CreativeWelcome onStory={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} onPrompt={() => document.getElementById("prompt")?.focus()} onPoetry={openPoetryWorkbench} />
             ) : (
               <div className="empty-state"><span className="empty-icon"><Sparkles size={26} /></span><strong>{emptyTitle}</strong><p>填写提示词，然后在这里查看生成结果。</p></div>
             )}
@@ -2079,10 +2088,11 @@ function App() {
               <div className="history-empty"><Clock3 size={18} /> 还没有已保存的图片。</div>
             )}
           </section>
-          <footer><span>{imageModel ? `Powered by ${imageModel}` : "正在读取图片模型"}</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
+          <footer><span>{imageModel ? `Powered by ${imageModel}` : "正在读取图片模型"}</span><span>生成图片将保存到桌面 Image-Assisant 文件夹</span></footer>
         </section>
         <aside className="extension-rail" aria-label="扩展功能">
-          <button className="extension-tool active" type="button" onClick={() => setStyleWorkbenchOpen(true)} title="从图片提取风格" aria-label="从图片提取风格" data-label="从图片提取风格">
+          <span className="extension-rail-heading">创作工具</span>
+          <button className="extension-tool" type="button" onClick={() => setStyleWorkbenchOpen(true)} title="从图片提取风格" aria-label="从图片提取风格" data-label="从图片提取风格">
             <WandSparkles size={20} />
             <span className="extension-tool-label">提取风格</span>
           </button>
@@ -2090,9 +2100,9 @@ function App() {
             <Search size={20} />
             <span className="extension-tool-label">提示词库</span>
           </button>
-          <button className="extension-tool" type="button" onClick={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} title="系列创作" aria-label="打开系列创作" data-label="系列创作">
+          <button className="extension-tool story-tool" type="button" onClick={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} title="系列创作" aria-label="打开系列创作" data-label="系列创作">
             <FolderKanban size={20} />
-            <span className="extension-tool-label">系列创作</span>
+            <span className="extension-tool-label">故事创作</span>
           </button>
           <button className="extension-tool" type="button" onClick={openPoetryWorkbench} title="诗词意境" aria-label="打开诗词意境工作台" data-label="诗词意境">
             <BookOpen size={20} />

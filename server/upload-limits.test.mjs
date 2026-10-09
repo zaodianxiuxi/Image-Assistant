@@ -21,5 +21,6 @@ test("frontend exposes common output ratios for every creation mode", async () =
   assert.match(source, /value: "1536x864", name: "电脑横屏", detail: "16:9"/);
   assert.match(source, /value: "864x1536", name: "手机竖屏", detail: "9:16"/);
   assert.match(source, /form\.append\("size", size\)/);
-  assert.doesNotMatch(source, /mode === "generate" && !referenceImages\.length/);
+  // Only guard the size control; the empty canvas may depend on this condition.
+  assert.doesNotMatch(source, /mode === "generate" && !referenceImages\.length\s*&&\s*\(\s*<div className="settings-block"/);
 });

@@ -274,6 +274,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
   const plan = project?.plan;
   const inputChanged = project?.plan && project.plannedInput !== inputKey(project);
   const remaining = plan && project ? selectStoryShots(plan.shots, project.results, "remaining").length : 0;
+  const castReady = Boolean(plan && project && plan.characters.filter(c => plan.shots.some(shot => shot.characterIds.includes(c.id))).every(c => project.references.some(r => r.kind === "character" && r.targetId === c.id && r.confirmed)));
 
   function entityCard(entity: StoryEntity, kind: "character" | "setting") {
     const ref = project!.references.find(r => r.kind === kind && r.targetId === entity.id);
@@ -291,7 +292,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
 
   return <div className="manager-backdrop story-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <section className="story-dialog" role="dialog" aria-modal="true" aria-label="故事分镜工作台">
-      <header className="manager-toolbar"><div><strong>故事分镜</strong><small>先定人物与镜头，再试拍、续拍</small></div><button className="icon-button" type="button" aria-label="关闭故事分镜" onClick={onClose}><X size={18} /></button></header>
+      <header className="manager-toolbar"><div><span className="story-kicker"><Clapperboard size={14} /> STORY STUDIO</span><strong>故事分镜</strong><small>先定人物与镜头，再试拍、续拍</small></div><button className="icon-button" type="button" aria-label="关闭故事分镜" onClick={onClose}><X size={18} /></button></header>
       <div className="story-body">
         <div className="story-project-bar">
           <select aria-label="已保存故事" disabled={busy || !project} value={project?.id || ""} onChange={e => void switchProject(e.target.value)}>{project && !projects.some(p => p.id === project.id) && <option value={project.id}>{project.title}</option>}{projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
@@ -301,6 +302,11 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
           <small role="status">{saveStatus}</small>
         </div>
         {!project ? <p>正在读取故事…</p> : <>
+          <div className="story-chapters" aria-label="故事创作阶段">
+            <div className={!plan || inputChanged ? "current" : ""}><span>01</span><div><strong>写下故事</strong><small>{plan ? `已规划 ${plan.shots.length} 个镜头` : "一个念头，就是开场"}</small></div></div>
+            <div className={plan && !inputChanged && !castReady ? "current" : ""}><span>02</span><div><strong>确定主角</strong><small>{project.references.some(r => r.confirmed) ? `已选定 ${project.references.filter(r => r.confirmed).length} 张参考` : "让人物与场景保持一致"}</small></div></div>
+            <div className={plan && !inputChanged && castReady ? "current" : ""}><span>03</span><div><strong>让故事成像</strong><small>{plan ? `${plan.shots.length - (remaining || 0)} 镜已完成 · ${remaining} 镜待完成` : "先试拍，再展开整个故事"}</small></div></div>
+          </div>
           <fieldset disabled={busy} className="story-fields">
             <section className="story-section"><h2>1. 故事与风格</h2>
               <StoryInspiration value={project.inspiration || emptyInspiration()} busy={busy} hasStory={Boolean(project.story.trim() || plan)} onChange={inspiration => update({ ...project, inspiration })} onGenerate={() => void generateIdeas()} onExpand={idea => void expandIdea(idea)} onAdopt={() => void adoptIdea()} />
@@ -321,7 +327,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
                 <div className="story-actions"><button className="primary" type="button" disabled={Boolean(inputChanged)} onClick={() => void generateShots("trial")}>四镜试拍</button><button type="button" disabled={!remaining || Boolean(inputChanged)} onClick={() => void generateShots("remaining")}>继续生成 · {remaining} 镜待完成</button></div>
                 <div className="story-shot-grid">{plan.shots.map((shot, i) => {
                   const result = project.results[shot.id];
-                  return <article className="story-shot" key={shot.id}>
+                  return <article className="story-shot" data-state={result?.stale ? "stale" : result?.image ? "done" : "pending"} key={shot.id}>
                     <header><strong>{String(i + 1).padStart(2,"0")} · {shot.title}</strong><span>{result?.stale ? "需重拍" : result?.image ? "已完成" : "待拍"}</span></header>
                     <p>{shot.storyText}</p><small>{plan.settings.find(s => s.id === shot.settingId)?.name} · {shot.characterIds.map(id => plan.characters.find(c => c.id === id)?.name).join("、") || "无人镜头"}</small>
                     {([['framing','景别与机位'],['action','当前动作'],['emotion','表情与视线'],['continuity','前后衔接']] as const).map(([field,label]) => <label key={field}>{label}<textarea aria-label={`第${i + 1}镜${label}`} rows={2} value={shot[field]} onChange={e => editShot(shot.id, field, e.target.value)} /></label>)}

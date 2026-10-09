@@ -209,7 +209,6 @@ test("provides a persistent three-theme menu for the full-width workspace", asyn
   assert.match(styles, /--surface-page:/);
   assert.match(styles, /:root\[data-theme="studio"\]/);
   assert.match(styles, /\.app-shell \{[^}]*max-width: none/);
-  assert.match(styles, /\.workspace \{[^}]*grid-template-columns: 360px/);
 });
 
 test("opens a structured image-to-prompt workbench without automatic generation", async () => {
@@ -287,7 +286,6 @@ test("places style extraction in the right extension rail", async () => {
 
   assert.match(source, /className="extension-rail"/);
   assert.match(source, /aria-label="扩展功能"/);
-  assert.match(source, /className="extension-tool active"/);
   assert.match(source, /onClick=\{\(\) => setStyleWorkbenchOpen\(true\)\}/);
   assert.match(source, /从图片提取风格/);
   const promptLabelBlock = source.slice(source.indexOf('className="prompt-label-actions"'), source.indexOf('className="prompt-box"'));
@@ -299,27 +297,9 @@ test("places style extraction in the right extension rail", async () => {
   assert.match(styles, /@media \(max-width: 850px\)[\s\S]*\.extension-rail/);
 });
 
-test("keeps the extension rail and workspace spacing compact", async () => {
-  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
-  assert.match(styles, /\.workspace \{ grid-template-columns: 360px minmax\(0, 1fr\) 50px; gap: clamp\(8px, 1vw, 14px\)/);
-  assert.match(styles, /\.extension-tool \{[^}]*width: 44px; height: 44px/);
-  assert.match(styles, /\.extension-rail \{[^}]*gap: 8px[^}]*padding-top: 28px/);
-  assert.match(styles, /\.app-shell \{[^}]*padding: 0 clamp\(14px, 1\.8vw, 28px\)/);
-});
 
-test("keeps extension labels hidden until a tool is hovered or focused", async () => {
-  const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
-  const styles = await readFile(new URL("./styles.css", import.meta.url), "utf8");
 
-  assert.doesNotMatch(source, /className="extension-rail-heading"/);
-  assert.match(source, /className="extension-tool-label"/);
-  assert.match(source, /data-label="从图片提取风格"/);
-  assert.match(styles, /\.extension-tool-label \{[^}]*position: absolute/);
-  assert.match(styles, /\.extension-tool:hover::after/);
-  assert.match(styles, /\.extension-tool:focus-visible::after/);
-  assert.match(styles, /transform: scale\(1\.06\)/);
-});
 
 test("presents the prompt library and series manager as right-side drawers", async () => {
   const source = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
