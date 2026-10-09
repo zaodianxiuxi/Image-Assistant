@@ -40,3 +40,17 @@ test("requests six validated Chinese prompt ideas from the configured text model
   assert.equal(prompts.length, 6);
   assert.ok(prompts.every((item) => item.id.startsWith("generated-")));
 });
+
+test("supplies user input for providers that map system messages to Responses instructions", async () => {
+  const prompts = await generatePromptCandidates({
+    apiBase: "https://example.test/v1", apiKey: "test-key", model: "gpt-test",
+    fetchImpl: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      const input = body.messages.filter(message => message.role === "user" && message.content.trim());
+      if (!input.length) return Response.json({ error: { message: 'One of "input" or "previous_response_id" or \'prompt\' or \'conversation\' must be provided.' } }, { status: 400 });
+      assert.match(input[0].content, /6/);
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ prompts: generatedPrompts() }) } }] });
+    }
+  });
+  assert.equal(prompts.length, 6);
+});

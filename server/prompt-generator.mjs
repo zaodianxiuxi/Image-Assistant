@@ -2,7 +2,7 @@ import { validatePromptCandidates } from "./prompt-cache.mjs";
 
 const SYSTEM_PROMPT = [
   "你是一名中文 AI 图像提示词编辑。",
-  "只返回 JSON 对象，格式为 {\\\"prompts\\\":[...] }。",
+  '只返回 JSON 对象，格式为 {"prompts":[...]}。',
   "生成恰好 6 条复杂且互不重复的中文图像提示词。",
   "每项必须有 title、category、size、prompt；size 只能是 1024x1024、1536x864 或 864x1536，prompt 长度为 80 到 500 个字符。",
   "prompt 只写画面主体、环境、动作、材质、光影、构图和风格等内容，不要写任何画幅、比例或尺寸信息（例如 1:1、16:9、9:16）。"
@@ -33,7 +33,11 @@ export async function generatePromptCandidates({
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     // The schema remains in the text prompt for compatibility with providers that omit response_format support.
-    body: JSON.stringify({ model, temperature: 1, messages: [{ role: "system", content: SYSTEM_PROMPT }] })
+    body: JSON.stringify({ model, temperature: 1, messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      // Some relays map system messages to instructions, which alone leave Responses input empty.
+      { role: "user", content: "请现在创作 6 条全新的中文图像提示词，题材和构图各不相同，并按要求返回完整 JSON。" }
+    ] })
   });
   const body = await response.json();
   if (!response.ok) throw new Error(body?.error?.message || body?.message || `文本模型请求失败（HTTP ${response.status}）。`);

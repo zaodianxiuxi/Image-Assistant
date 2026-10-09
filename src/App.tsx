@@ -36,6 +36,7 @@ import { groupHistoryRecords } from "./gallery-groups.mjs";
 import { enrichSessionVersion, markSessionDelivery } from "./image-version-session.mjs";
 import { ImageRequestError, retryPoetryImageRequest } from "./poetry-image-retry.mjs";
 import StyleWorkbench from "./StyleWorkbench";
+import StoryWorkbench from "./StoryWorkbench";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -129,7 +130,7 @@ const SIZES = [
 ];
 
 const MAX_REFERENCE_IMAGES = 10;
-const STORYBOARD_STYLE_PREFIX = "写实、现实质感的东方志怪电影摄影风格，古代中国环境，可信的人物比例和材质，统一角色外貌、服装、时代与光影，不要卡通、插画或现代物品。";
+const STORYBOARD_STYLE_PREFIX = "遵循故事本身的时代与视觉设定，人物专注于当前动作，表情自然，保持角色身份和道具连续，按当前分镜调整构图与机位。";
 const DEFAULT_POETRY_STYLE_GUIDE = "整体采用唐代长安旧都的历史氛围，统一为黄昏到入夜前的冷暖交替色调，人物为同一位中年文士，青色圆领长袍、黑色幞头、浅灰旧氅衣，始终以电影感写实水墨风呈现，强调高城、渭水、荒苑、秋叶、风雨与远眺的连续空间关系。";
 const POETRY_IMAGE_QUALITY_GUIDE = "画质与曝光要求：保持诗意氛围但整体曝光充足、主体面部和服装细节清晰可见，阴影保留层次，不要欠曝、死黑或灰暗糊成一片；画面干净锐利、低噪点、低数字噪声，仅保留轻微细腻且不影响细节的胶片颗粒，避免重颗粒、脏污、色带和低清晰度。";
 const DEFAULT_POETRY_CHARACTER_BIBLE = "固定主角：同一位中年男性文士，面容清瘦、眉骨分明、肤色偏白、黑色长发束于黑色幞头，体型修长。固定服装：青色圆领长袍，外罩浅灰旧氅衣，深色腰带与布靴；固定配饰与道具：木簪、旧竹简和木栏，不可改变年龄、脸型、发型、服装颜色材质款式、配饰、道具和唐代身份。";
@@ -289,6 +290,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [apiReady, setApiReady] = useState<boolean | null>(null);
+  const [imageModel, setImageModel] = useState("");
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
@@ -309,6 +311,7 @@ function App() {
   const [librarySearch, setLibrarySearch] = useState("");
   const [libraryStatus, setLibraryStatus] = useState("");
   const [seriesOpen, setSeriesOpen] = useState(false);
+  const [storyWorkbenchOpen, setStoryWorkbenchOpen] = useState(false);
   const [poetryOpen, setPoetryOpen] = useState(false);
   const [poetryProjects, setPoetryProjects] = useState<PoetryProject[]>([]);
   const [activePoetryProjectId, setActivePoetryProjectId] = useState<number | null>(null);
@@ -538,6 +541,7 @@ function App() {
       .then((response) => response.json())
       .then((data) => {
         setApiReady(Boolean(data.configured));
+        setImageModel(typeof data.imageModel === "string" ? data.imageModel : "");
         setDatabaseConfigured(Boolean(data.databaseConfigured));
       })
       .catch(() => {
@@ -707,6 +711,7 @@ function App() {
       })
       .then((data) => {
         const configured = Boolean(data.apiKeyConfigured);
+        setImageModel(typeof data.imageModel === "string" ? data.imageModel : "");
         setApiReady(configured);
         setApiKeyStatus(configured ? "已配置" : "未配置");
       })
@@ -1816,7 +1821,7 @@ function App() {
   const executionSteps = [
     { id: "validating", label: "校验提示词和请求参数" },
     { id: "sending", label: referenceImages.length ? `上传 ${referenceImages.length} 张参考图到本地代理` : "发送提示词到本地代理" },
-    { id: "processing", label: "等待 gpt-image-2 返回图片" }
+    { id: "processing", label: `等待 ${imageModel || "图片模型"} 返回图片` }
   ] as const;
   const activeStep = executionStage === "validating" ? 0 : executionStage === "sending" ? 1 : 2;
 
@@ -2074,7 +2079,7 @@ function App() {
               <div className="history-empty"><Clock3 size={18} /> 还没有已保存的图片。</div>
             )}
           </section>
-          <footer><span>Powered by gpt-image-2</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
+          <footer><span>{imageModel ? `Powered by ${imageModel}` : "正在读取图片模型"}</span><span>图片已保存到桌面 Image-Assisant 文件夹</span></footer>
         </section>
         <aside className="extension-rail" aria-label="扩展功能">
           <button className="extension-tool active" type="button" onClick={() => setStyleWorkbenchOpen(true)} title="从图片提取风格" aria-label="从图片提取风格" data-label="从图片提取风格">
@@ -2085,7 +2090,7 @@ function App() {
             <Search size={20} />
             <span className="extension-tool-label">提示词库</span>
           </button>
-          <button className="extension-tool" type="button" onClick={() => openManager("series")} title="系列创作" aria-label="打开系列创作" data-label="系列创作">
+          <button className="extension-tool" type="button" onClick={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} title="系列创作" aria-label="打开系列创作" data-label="系列创作">
             <FolderKanban size={20} />
             <span className="extension-tool-label">系列创作</span>
           </button>
@@ -2308,7 +2313,7 @@ function App() {
             <div className="manager-toolbar"><strong>系列创作</strong><button className="icon-button" type="button" onClick={() => closeManager("series")} title="关闭系列创作" aria-label="关闭系列创作"><X size={18} /></button></div>
             <div className="manager-body series-manager">
               <div className="manager-search"><input value={newSeriesName} onChange={(event) => setNewSeriesName(event.target.value)} placeholder="新系列名称" /><button type="button" onClick={() => void createNewSeries()}><Plus size={14} /> 创建系列</button></div>
-              {activeSeries && <div className="storyboard-form"><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="粘贴志怪故事原文或故事梗概，程序会自动拆分成连续画面节点。" rows={5} /><div><button type="button" onClick={() => void createStoryboard()} disabled={storyboardLoading || seriesNodes.length > 0}>{storyboardLoading ? <LoaderCircle className="spin" size={14} /> : <WandSparkles size={14} />}{storyboardLoading ? "正在拆分" : "自动拆分故事"}</button><button type="button" onClick={() => void generateStoryboardImages()} disabled={batchGenerating || !seriesNodes.length}>{batchGenerating ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}{batchGenerating ? "正在批量生成" : "批量生成图片"}</button></div></div>}
+              {activeSeries && <div className="storyboard-form"><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="粘贴故事原文或故事梗概，程序会自动拆分成连续画面节点。" rows={5} /><div><button type="button" onClick={() => void createStoryboard()} disabled={storyboardLoading || seriesNodes.length > 0}>{storyboardLoading ? <LoaderCircle className="spin" size={14} /> : <WandSparkles size={14} />}{storyboardLoading ? "正在拆分" : "自动拆分故事"}</button><button type="button" onClick={() => void generateStoryboardImages()} disabled={batchGenerating || !seriesNodes.length}>{batchGenerating ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}{batchGenerating ? "正在批量生成" : "批量生成图片"}</button></div></div>}
               <div className="series-layout">
                 <div className="series-list">{seriesList.map((series) => <button type="button" key={series.id} className={activeSeries?.id === series.id ? "series-entry active" : "series-entry"} onClick={() => void selectSeries(series)}><strong>{series.name}</strong><small>系列 #{series.id}</small></button>)}{!seriesList.length && <p className="manager-empty">暂无系列。</p>}</div>
                 <div className="node-panel">
@@ -2323,6 +2328,20 @@ function App() {
           </section>
         </div>
       )}
+      <StoryWorkbench
+        open={storyWorkbenchOpen}
+        onClose={() => setStoryWorkbenchOpen(false)}
+        onLegacy={() => { setStoryWorkbenchOpen(false); openManager("series"); }}
+        onImage={(image, imagePrompt, title, project, order) => {
+          if (!image.image) return;
+          const result: Result = { id: image.databaseId ? "db-" + image.databaseId : crypto.randomUUID(), src: image.image, imageRecordId: image.databaseId, fileName: image.fileName, prompt: imagePrompt, nodeTitle: title, nodeOrder: order, seriesName: project, kind: "generate", createdAt: new Date(), versionId: image.versionId, versionGroupId: image.versionGroupId, versionNumber: image.versionNumber, parentVersionId: image.parentVersionId, isDelivery: image.isDelivery };
+          const versionedResult = image.versionId ? result : enrichSessionVersion(result, null);
+          setCurrent(versionedResult);
+          setHistory(items => [versionedResult, ...items].slice(0, 60));
+          setActivityStatus(`故事「${project}」第${order}镜已生成：${title}`);
+          setActivityTone("success");
+        }}
+      />
       <StyleWorkbench
         open={styleWorkbenchOpen}
         databaseConfigured={databaseConfigured}

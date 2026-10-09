@@ -86,3 +86,14 @@ test("normalizes provider output to the requested poetry image size", async () =
     assert.deepEqual({ width: metadata.width, height: metadata.height }, { width: 864, height: 1536 });
   });
 });
+
+test("reference output keeps edge details when the provider returns another aspect ratio", async () => {
+  await withTemporaryDirectory(async outputDirectory => {
+    const source = await sharp({ create: { width: 100, height: 200, channels: 3, background: "blue" } })
+      .composite([{ input: await sharp({ create: { width: 100, height: 20, channels: 3, background: "red" } }).png().toBuffer(), top: 0, left: 0 }]).png().toBuffer();
+    const result = await saveProviderImage({ item: { b64_json: source.toString("base64") }, outputDirectory, size: "1024x1024", preserveComposition: true });
+    const { data, info } = await sharp(path.join(outputDirectory, result.relativePath)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const pixel = (10 * info.width + 512) * info.channels;
+    assert.ok(data[pixel] > 240 && data[pixel + 2] < 10, "top red edge must remain visible");
+  });
+});

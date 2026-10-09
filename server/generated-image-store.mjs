@@ -71,12 +71,12 @@ const OUTPUT_DIMENSIONS = {
   "864x1536": [864, 1536]
 };
 
-async function normalizeImageSize(bytes, size) {
+async function normalizeImageSize(bytes, size, preserveComposition) {
   const dimensions = OUTPUT_DIMENSIONS[size];
   if (!dimensions) return bytes;
   try {
     return await sharp(bytes)
-      .resize(dimensions[0], dimensions[1], { fit: "cover", position: "centre" })
+      .resize(dimensions[0], dimensions[1], { fit: preserveComposition ? "contain" : "cover", position: "centre", background: "#eeeeee" })
       .png()
       .toBuffer();
   } catch {
@@ -94,13 +94,14 @@ export async function saveProviderImage({
   prompt,
   seriesName,
   nodeOrder,
-  size
+  size,
+  preserveComposition = false
 }) {
   if (typeof outputDirectory !== "string" || !outputDirectory) {
     throw new Error("未配置本地图片保存目录。");
   }
 
-  const imageBytes = await normalizeImageSize(await getImageBytes(item, fetchImpl), size);
+  const imageBytes = await normalizeImageSize(await getImageBytes(item, fetchImpl), size, preserveComposition);
   const dateDirectoryName = formatDate(now);
   const dateDirectory = path.join(outputDirectory, dateDirectoryName);
   const seriesDirectoryName = seriesName ? sanitizeName(seriesName, "未命名系列") : "";

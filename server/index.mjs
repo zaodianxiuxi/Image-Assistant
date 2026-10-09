@@ -8,7 +8,8 @@ import { getDesktopAppDirectory } from "./desktop-path.mjs";
 import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-image-store.mjs";
 import { readPromptCache, validatePromptCandidates, writePromptCache } from "./prompt-cache.mjs";
 import { generatePromptCandidates } from "./prompt-generator.mjs";
-import { generateStoryboard } from "./storyboard-generator.mjs";
+import { generateStoryboard, generateStoryPlan } from "./storyboard-generator.mjs";
+import { generateStoryIdeas, expandStoryIdea } from "./story-inspiration.mjs";
 import { analyzePoetry, generatePoetryScenes } from "./poetry-generator.mjs";
 import { analyzeImageStyle } from "./style-analyzer.mjs";
 import { composeStylePrompt } from "./style-composer.mjs";
@@ -48,6 +49,7 @@ const upload = multer({
 });
 const port = Number(process.env.PORT || 3001);
 const apiBase = (process.env.SUDOCODE_BASE_URL || "https://api.sudocode.chat/v1").replace(/\/$/, "");
+const imageModel = process.env.SUDOCODE_IMAGE_MODEL?.trim() || "gpt-image-2.5-sunburst";
 const envFile = process.env.IMAGE_ASSISTANT_ENV_FILE || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".env");
 let generatedImageDirectoryPromise;
 
@@ -168,7 +170,8 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
     prompt: metadata.prompt,
     seriesName: metadata.seriesName,
     nodeOrder: metadata.nodeOrder,
-    size: metadata.size
+    size: metadata.size,
+    preserveComposition: metadata.preserveComposition
   });
   let databaseId = null;
   let versionInfo = null;
@@ -184,7 +187,7 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
       prompt: metadata.prompt || item.revised_prompt || "",
       size: metadata.size,
       operation,
-      model: "gpt-image-2",
+      model: imageModel,
       providerRequestId: response.headers.get("x-request-id") || response.headers.get("request-id")
     });
     versionInfo = await saveImageVersion({
@@ -203,6 +206,7 @@ async function parseProviderResponse(response, requestId, operation, metadata = 
     log("database_save_failed", { requestId, operation, ...errorDetails(error) });
   }
   return {
+    model: imageModel,
     image: savedImage.imageUrl,
     fileName: savedImage.fileName,
     relativePath: savedImage.relativePath,
@@ -220,12 +224,13 @@ app.get("/api/health", (_req, res) => {
   res.json({
     configured: Boolean(process.env.SUDOCODE_API_KEY),
     databaseConfigured: isDatabaseConfigured(),
+    imageModel,
     baseUrl: apiBase
   });
 });
 
 app.get("/api/settings", (_req, res) => {
-  res.json({ apiKeyConfigured: Boolean(process.env.SUDOCODE_API_KEY) });
+  res.json({ apiKeyConfigured: Boolean(process.env.SUDOCODE_API_KEY), imageModel });
 });
 
 app.put("/api/settings/api-key", async (req, res) => {
@@ -326,6 +331,35 @@ app.get("/api/series", async (req, res) => {
     res.json({ series: await listSeries(), databaseConfigured: isDatabaseConfigured() });
   } catch (error) {
     sendError(req, res, 503, error instanceof Error ? error.message : "读取系列失败。", { operation: "series", ...errorDetails(error) });
+  }
+});
+
+for (const [route, generate, key] of [["ideas", generateStoryIdeas, "ideas"], ["expand", expandStoryIdea, "draft"]]) {
+  app.post(`/api/storyboard/${route}`, async (req, res) => {
+    if (!requireApiKey(req, res)) return;
+    try {
+      const result = await generate({
+        genre: req.body?.genre, mood: req.body?.mood, keywords: req.body?.keywords,
+        previousTitles: req.body?.previousTitles, idea: req.body?.idea,
+        apiBase, apiKey: process.env.SUDOCODE_API_KEY, model: process.env.SUDOCODE_TEXT_MODEL
+      });
+      res.json({ [key]: result });
+    } catch (error) {
+      sendError(req, res, 400, error instanceof Error ? error.message : "生成故事失败。", { operation: `story_${route}` });
+    }
+  });
+}
+
+app.post("/api/storyboard/plan", async (req, res) => {
+  if (!requireApiKey(req, res)) return;
+  try {
+    const plan = await generateStoryPlan({
+      apiBase, apiKey: process.env.SUDOCODE_API_KEY, model: process.env.SUDOCODE_TEXT_MODEL,
+      story: req.body?.story, shotCount: req.body?.shotCount, style: req.body?.style
+    });
+    res.json({ plan });
+  } catch (error) {
+    sendError(req, res, 400, error instanceof Error ? error.message : "故事规划失败。", { operation: "storyboard_plan" });
   }
 });
 
@@ -648,7 +682,7 @@ app.post("/api/images/generate", async (req, res) => {
     requestId: req.requestId,
     operation: "generate",
     endpoint: `${apiBase}/images/generations`,
-    model: "gpt-image-2",
+    model: imageModel,
     promptChars: prompt.trim().length,
     size: imageSize
   });
@@ -656,11 +690,12 @@ app.post("/api/images/generate", async (req, res) => {
     const response = await fetch(`${apiBase}/images/generations`, {
       method: "POST",
       headers: { ...headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-2", prompt: prompt.trim(), size: imageSize })
+      body: JSON.stringify({ model: imageModel, prompt: prompt.trim(), size: imageSize })
     });
     res.json(await parseProviderResponse(response, req.requestId, "generate", {
       prompt: prompt.trim(),
       size: imageSize,
+      preserveComposition: req.body?.preserveComposition === true,
       title: typeof req.body?.title === "string" ? req.body.title : undefined,
       seriesName: typeof req.body?.seriesName === "string" ? req.body.seriesName : undefined,
       seriesId: Number.isInteger(Number(req.body?.seriesId)) ? Number(req.body.seriesId) : null,
@@ -713,7 +748,7 @@ app.post(
       requestId: req.requestId,
       operation: "edit",
       endpoint: `${apiBase}/images/edits`,
-      model: "gpt-image-2",
+      model: imageModel,
       promptChars: prompt.trim().length,
       size: imageSize,
       imageCount: images.length,
@@ -722,7 +757,7 @@ app.post(
     });
     try {
       const form = new FormData();
-      form.append("model", "gpt-image-2");
+      form.append("model", imageModel);
       form.append("prompt", prompt.trim());
       form.append("size", imageSize);
       images.forEach((image) => {
@@ -738,6 +773,7 @@ app.post(
       res.json(await parseProviderResponse(response, req.requestId, "edit", {
         prompt: prompt.trim(),
         size: imageSize,
+        preserveComposition: req.body?.preserveComposition === "true",
         title: typeof req.body?.title === "string" ? req.body.title : undefined,
         seriesName: typeof req.body?.seriesName === "string" ? req.body.seriesName : undefined,
         seriesId: Number.isInteger(Number(req.body?.seriesId)) ? Number(req.body.seriesId) : null,
@@ -768,6 +804,7 @@ app.listen(port, () => {
   log("server_started", {
     address: `http://localhost:${port}`,
     apiBase,
+    imageModel,
     apiKeyConfigured: Boolean(process.env.SUDOCODE_API_KEY)
   });
 });
