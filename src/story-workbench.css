@@ -105,6 +105,7 @@
 .story-shot[data-state="done"] header > span { color: var(--success); }
 .story-shot[data-state="stale"] header > span { color: var(--accent); background: var(--accent-soft); }
 .story-shot > small { font-size: 11px; }
+.story-shot:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 .story-progress { padding: 15px 28px; }.story-progress > div { color: var(--text-muted); font-size: 11px; }
 @keyframes story-studio-in { from { opacity: .6; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
 @media (max-width: 750px) {

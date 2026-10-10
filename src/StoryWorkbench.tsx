@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { X, LoaderCircle, Plus, Clapperboard, CheckCircle2, ImagePlus } from "lucide-react";
+import { X, LoaderCircle, Plus, Clapperboard, CheckCircle2, ImagePlus, BookOpen } from "lucide-react";
 import { buildStoryImagePrompt, buildStoryReferencePrompt, selectStoryReferences, selectStoryShots } from "./storyboard-continuity.mjs";
 import type { StoryEntity, StoryReference, StoryResult, StoryShot } from "./storyboard-continuity.mjs";
 import { listStoryProjects, newStoryProject, saveStoryProject } from "./story-project-store";
 import type { StoryProject } from "./story-project-store";
 import StoryInspiration, { emptyInspiration } from "./StoryInspiration";
+import StoryReader from "./StoryReader";
 import type { StoryIdea } from "./StoryInspiration";
 import "./story-workbench.css";
 
@@ -45,6 +46,8 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState("正在读取本地故事…");
   const [preview, setPreview] = useState<StoryResult | null>(null);
+  const [readerOpen, setReaderOpen] = useState(false);
+  const shotCards = useRef(new Map<string, HTMLElement>());
 
   function update(next: StoryProject) {
     const value = { ...next, updatedAt: Date.now() };
@@ -86,11 +89,11 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
     return () => window.clearTimeout(timer);
   }, [project]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || readerOpen) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if (preview) setPreview(null); else onClose(); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, preview, onClose]);
+  }, [open, preview, readerOpen, onClose]);
 
   async function switchProject(id?: string) {
     if (working.current) return;
@@ -297,6 +300,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
         <div className="story-project-bar">
           <select aria-label="已保存故事" disabled={busy || !project} value={project?.id || ""} onChange={e => void switchProject(e.target.value)}>{project && !projects.some(p => p.id === project.id) && <option value={project.id}>{project.title}</option>}{projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
           <button type="button" disabled={busy} onClick={() => void switchProject()}><Plus size={14} />新故事</button>
+          <button type="button" className="primary" disabled={!plan?.shots.length} title={plan?.shots.length ? "按顺序阅读图片与旁白" : "先规划故事分镜，再预览成片"} onClick={() => setReaderOpen(true)}><BookOpen size={14} />故事成片预览</button>
           <button type="button" disabled={!project || busy} onClick={() => void exportProject().catch(e => setError(message(e)))}>导出备份</button>
           <button type="button" disabled={busy} onClick={onLegacy}>已有数据库系列</button>
           <small role="status">{saveStatus}</small>
@@ -327,7 +331,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
                 <div className="story-actions"><button className="primary" type="button" disabled={Boolean(inputChanged)} onClick={() => void generateShots("trial")}>四镜试拍</button><button type="button" disabled={!remaining || Boolean(inputChanged)} onClick={() => void generateShots("remaining")}>继续生成 · {remaining} 镜待完成</button></div>
                 <div className="story-shot-grid">{plan.shots.map((shot, i) => {
                   const result = project.results[shot.id];
-                  return <article className="story-shot" data-state={result?.stale ? "stale" : result?.image ? "done" : "pending"} key={shot.id}>
+                  return <article className="story-shot" tabIndex={-1} ref={element => { if (element) shotCards.current.set(shot.id, element); else shotCards.current.delete(shot.id); }} data-state={result?.stale ? "stale" : result?.image ? "done" : "pending"} key={shot.id}>
                     <header><strong>{String(i + 1).padStart(2,"0")} · {shot.title}</strong><span>{result?.stale ? "需重拍" : result?.image ? "已完成" : "待拍"}</span></header>
                     <p>{shot.storyText}</p><small>{plan.settings.find(s => s.id === shot.settingId)?.name} · {shot.characterIds.map(id => plan.characters.find(c => c.id === id)?.name).join("、") || "无人镜头"}</small>
                     {([['framing','景别与机位'],['action','当前动作'],['emotion','表情与视线'],['continuity','前后衔接']] as const).map(([field,label]) => <label key={field}>{label}<textarea aria-label={`第${i + 1}镜${label}`} rows={2} value={shot[field]} onChange={e => editShot(shot.id, field, e.target.value)} /></label>)}
@@ -344,6 +348,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
       </div>
       <footer className="story-progress"><div role="status">{busy && <LoaderCircle size={16} className="spin" />}<span>{status || (plan ? `已恢复故事，共 ${plan.shots.length} 镜，${plan.shots.length - (remaining || 0)} 镜已完成，${remaining} 镜待生成或重拍。` : "输入故事开始规划。故事与参考图保存在当前浏览器，图片保存到桌面。")}</span></div>{error && <p role="alert">{error}</p>}{batchRunning && <button type="button" disabled={pauseRequested} onClick={() => { stop.current = true; setPauseRequested(true); setStatus("当前请求完成后暂停，已完成内容会保留。"); }}>{pauseRequested ? "将在当前镜头完成后暂停" : "当前镜头后暂停"}</button>}</footer>
     </section>
+    {readerOpen && project && <StoryReader project={project} inputChanged={Boolean(inputChanged)} onClose={() => setReaderOpen(false)} onEdit={shotId => { setReaderOpen(false); requestAnimationFrame(() => { const card = shotCards.current.get(shotId); card?.scrollIntoView({ block: "center" }); card?.focus({ preventScroll: true }); }); }} />}
     {preview?.image && <div className="story-preview" role="dialog" aria-modal="true" aria-label="故事图片预览" onClick={() => setPreview(null)}><button className="icon-button" aria-label="关闭故事图片预览" type="button" onClick={() => setPreview(null)}><X /></button><img src={preview.image} alt="故事分镜生成结果" /></div>}
   </div>;
 }
