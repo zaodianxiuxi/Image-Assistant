@@ -1,0 +1,20 @@
+.story-dialog .shot-revisions { margin-top: 20px; border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; background: var(--surface-page); }
+.story-dialog .shot-revisions > summary { display: flex; align-items: center; gap: 8px; padding: 13px; color: var(--accent); font-weight: 500; list-style: none; }
+.shot-revisions > summary::-webkit-details-marker { display: none; }.shot-revisions > summary > span { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+.retake-editor, .version-comparison { padding: 16px; border-top: 1px solid var(--border-subtle); }
+.retake-editor > strong, .version-comparison-heading > strong { font-size: 13px; font-weight: 500; }
+.retake-issues { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 16px; }
+.story-dialog .retake-issues button { font-size: 11px; padding: 7px 9px; }.story-dialog .retake-issues button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.version-comparison-heading p { color: var(--text-muted); font-size: 11px; line-height: 1.8; }
+.version-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }.shot-version:only-child { grid-column: 1 / -1; }
+.shot-version { min-width: 0; border: 1px solid var(--border-subtle); border-radius: 9px; padding: 10px; background: var(--surface-panel); }
+.shot-version.selected { border-color: color-mix(in srgb, var(--accent), var(--border-subtle) 40%); }
+.story-dialog .version-image { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; padding: 0; width: 100%; height: 200px; overflow: hidden; background: var(--surface-canvas); border: 0; }
+.version-image img { display: block; min-width: 0; min-height: 0; width: 100%; height: 100%; object-fit: contain; }
+.shot-version > small { display: block; margin-top: 9px; font-size: 10px; }.shot-version > p { font-size: 11px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.shot-version .version-prompt { font-size: 10px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }
+.story-dialog .version-warning { color: var(--accent); font-size: 11px; }.shot-version > button { width: 100%; margin-top: 10px; }
+.version-image-error { min-height: 150px; padding: 15px; color: var(--danger); font-size: 11px; }
+.story-shot:has(.shot-revisions[open]) { grid-column: 1 / -1; }
+.story-shot:has(.shot-revisions[open]) .version-image { height: 300px; }
+@media (max-width: 650px) { .version-pair { grid-template-columns: 1fr; }.story-shot:has(.shot-revisions[open]) .version-image { height: 230px; }.retake-editor, .version-comparison { padding: 12px; } }

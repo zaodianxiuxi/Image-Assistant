@@ -6,6 +6,8 @@ import { listStoryProjects, newStoryProject, saveStoryProject } from "./story-pr
 import type { StoryProject } from "./story-project-store";
 import StoryInspiration, { emptyInspiration } from "./StoryInspiration";
 import StoryReader from "./StoryReader";
+import StoryShotRevisions from "./StoryShotRevisions";
+import { addShotVersion, adoptShotVersion, appendRetakeInstruction } from "./story-shot-versions.mjs";
 import type { StoryIdea } from "./StoryInspiration";
 import "./story-workbench.css";
 
@@ -125,7 +127,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
         await saveStoryProject(archived);
         setProjects(items => [archived, ...items.filter(item => item.id !== archived.id)]);
       }
-      update({ ...p, id: p.plan ? crypto.randomUUID() : p.id, title: plan.title, plan, plannedInput: inputKey(p), references: [], results: {} });
+      update({ ...p, id: p.plan ? crypto.randomUUID() : p.id, title: plan.title, plan, plannedInput: inputKey(p), references: [], results: {}, shotVersions: {}, retakeDrafts: {} });
       setStatus(`已规划 ${plan.shots.length} 镜。先检查人物和分镜，再选定角色参考图。${p.plan ? "原版本已保留在故事列表。" : ""}`);
     });
   }
@@ -193,7 +195,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
       setStatus("参考图已生成。检查外貌和服装，满意后点击“选定此图”。");
     });
   }
-  async function generateShots(mode: "trial" | "remaining" | string) {
+  async function generateShots(mode: "trial" | "remaining" | string, instruction = "") {
     const p = current.current; if (!p?.plan) return;
     if (p.plannedInput !== inputKey(p)) { setError("故事、风格或镜头数量已改动，请先重新规划。"); return; }
     const shots = mode === "trial" || mode === "remaining" ? selectStoryShots(p.plan.shots, p.results, mode) : p.plan.shots.filter(s => s.id === mode);
@@ -218,7 +220,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
         const previous = before && lastResult?.image && !lastResult.stale ? { shot: before, image: lastResult.image } : null;
         const refs = selectStoryReferences(shot, latest.references.filter(r => r.confirmed), previous);
         const canvas = latest.size === "1536x864" ? "横向16:9宽画幅" : latest.size === "864x1536" ? "竖向9:16画幅" : "正方形画幅";
-        const prompt = `输出一张${canvas}的全新分镜，重新组织构图以铺满目标画布，不沿用参考图片的画幅和裁切。按当前景别保留完整头部及关键动作，不要黑边。\n` + buildStoryImagePrompt(plan, shot, refs);
+        const prompt = appendRetakeInstruction(`输出一张${canvas}的全新分镜，重新组织构图以铺满目标画布，不沿用参考图片的画幅和裁切。按当前景别保留完整头部及关键动作，不要黑边。\n` + buildStoryImagePrompt(plan, shot, refs), instruction);
         setStatus(`正在生成第 ${order + 1} 镜「${shot.title}」，本批 ${completed + 1}/${shots.length}…`);
         try {
           let response: Response;
@@ -244,10 +246,8 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
           }
           const result: StoryResult = await readResponse(response);
           const next = current.current!;
-          // Later frames may depend on this frame; preserve them but mark for review/re-shoot.
-          const downstream = new Set(plan.shots.slice(order + 1).map(s => s.id));
-          const results = Object.fromEntries(Object.entries(next.results).map(([id, value]) => [id, mode !== "trial" && mode !== "remaining" && downstream.has(id) ? { ...value, stale: true } : value]));
-          const snapshot = update({ ...next, results: { ...results, [shot.id]: result } });
+          const candidateOnly = mode !== "trial" && mode !== "remaining" && Boolean(next.results[shot.id]?.image);
+          const snapshot = update(addShotVersion(next, shot.id, result, { id: crypto.randomUUID(), prompt, instruction, createdAt: Date.now() }, !candidateOnly));
           onImage(result, prompt, shot.title, latest.title, order + 1);
           completed++;
           if (!await persist(snapshot)) {
@@ -257,12 +257,26 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
           }
         } catch (caught) {
           const next = current.current!;
-          update({ ...next, results: { ...next.results, [shot.id]: { ...next.results[shot.id], error: message(caught), stale: true } } });
+          // A failed single-shot retake must not invalidate the currently chosen image.
+          if (mode === "trial" || mode === "remaining" || !next.results[shot.id]?.image) {
+            update({ ...next, results: { ...next.results, [shot.id]: { ...next.results[shot.id], error: message(caught), stale: true } } });
+          }
           throw new Error(`第${order + 1}镜失败，批次已停止，已完成图片保留。${message(caught)}`);
         }
       }
-      setStatus(`${stop.current ? "已暂停" : "本批完成"}：生成 ${completed} 张。请检查人物、动作和衔接，再继续或单镜重拍。`);
+      setStatus(mode !== "trial" && mode !== "remaining" && p.results[mode]?.image && completed ? "新版已生成，当前采用版保持不变。展开该镜的版本对比，满意后点击“采用这个版本”。" : `${stop.current ? "已暂停" : "本批完成"}：生成 ${completed} 张。请检查人物、动作和衔接，再继续或单镜重拍。`);
     }, shots.length > 1);
+  }
+
+  async function chooseVersion(shotId: string, versionId: string) {
+    const p = current.current; if (!p?.plan) return;
+    const next = adoptShotVersion(p, shotId, versionId);
+    if (next === p) return;
+    await run(async () => {
+      const snapshot = update(next);
+      if (!await persist(snapshot)) throw new Error("版本选择尚未保存，请勿刷新；请先导出故事备份。");
+      setStatus(next.results[shotId].stale ? "已采用这版，但它与当前设定不匹配或缺少原始记录，仍标记为需重拍；后续镜头也请重新检查。" : "已采用所选版本，故事预览与后续参考已更新；后续已生成镜头标记为需重拍。");
+    });
   }
 
   async function exportProject() {
@@ -339,6 +353,7 @@ export default function StoryWorkbench({ open, onClose, onLegacy, onImage }: Pro
                     {result?.image && <button className="story-image" type="button" onClick={() => setPreview(result)} aria-label={`预览第${i + 1}镜`}><img src={result.image} alt={shot.title} /></button>}
                     {result?.error && <p className="story-error">{result.error}</p>}
                     <div className="story-actions"><button type="button" disabled={Boolean(inputChanged)} onClick={() => void generateShots(shot.id)}>{result?.image ? "重拍此镜" : result?.error ? "重试此镜" : "生成此镜"}</button>{result?.image && <a href={result.image} download={result.fileName}>下载图片</a>}</div>
+                    <StoryShotRevisions key={project.id + shot.id} project={project} shot={shot} order={i + 1} busy={busy} inputChanged={Boolean(inputChanged)} onDraft={draft => { const p = current.current; if (p) update({ ...p, retakeDrafts: { ...p.retakeDrafts, [shot.id]: draft } }); }} onGenerate={instruction => void generateShots(shot.id, instruction)} onAdopt={id => void chooseVersion(shot.id, id)} onPreview={setPreview} />
                   </article>;
                 })}</div>
               </section>

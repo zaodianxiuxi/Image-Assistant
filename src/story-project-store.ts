@@ -1,10 +1,13 @@
 import type { StoryPlan, StoryReference, StoryResult } from "./storyboard-continuity.mjs";
 import type { StoryInspirationState } from "./StoryInspiration";
+import type { ShotVersion, RetakeDraft } from "./story-shot-versions.mjs";
 
 export type StoryProject = {
   id: string; title: string; updatedAt: number; story: string; style: string; shotCount: number; size: string;
   plannedInput?: string; plan: StoryPlan | null; references: StoryReference[]; results: Record<string, StoryResult>;
   inspiration?: StoryInspirationState;
+  shotVersions?: Record<string, ShotVersion[]>;
+  retakeDrafts?: Record<string, RetakeDraft>;
 };
 
 let database: Promise<IDBDatabase> | undefined;

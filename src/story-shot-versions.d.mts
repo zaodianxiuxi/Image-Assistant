@@ -1,0 +1,12 @@
+import type { StoryProject } from "./story-project-store";
+import type { StoryResult } from "./storyboard-continuity.mjs";
+export type ShotVersion = { id: string; result: StoryResult; createdAt: number | null; prompt: string; instruction: string; contextKey: string };
+export type RetakeDraft = { issues: string[]; notes: string; instruction: string };
+export function shotContextKey(project: StoryProject, shotId: string): string;
+export function getShotVersions(project: StoryProject, shotId: string): ShotVersion[];
+export function isShotVersionCurrent(project: StoryProject, shotId: string, version: ShotVersion): boolean;
+export function adoptShotVersion(project: StoryProject, shotId: string, versionId: string): StoryProject;
+export function addShotVersion(project: StoryProject, shotId: string, result: StoryResult, details: { id: string; prompt?: string; instruction?: string; createdAt?: number }, autoAdopt: boolean): StoryProject;
+export const RETAKE_ISSUES: { id: string; label: string; instruction: string }[];
+export function buildRetakeInstruction(issues: string[], notes: string): string;
+export function appendRetakeInstruction(prompt: string, instruction: string): string;
