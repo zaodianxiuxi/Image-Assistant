@@ -44,7 +44,7 @@ type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "comple
 type PoetryWorkflowStage = "analysis" | "storyboard" | "images";
 type PoetryImageProgress = { status: "idle" | "running" | "done" | "error"; completed: number; total: number; currentTitle: string };
 type PoetrySceneGenerationState = { status: "waiting" | "running" | "success" | "error"; message: string; attempt: number };
-type Theme = "light" | "dark" | "studio";
+type Theme = "light" | "dark" | "studio" | "paper";
 type ManagerPanel = "library" | "series";
 type ReferenceImage = {
   file: File;
@@ -180,11 +180,12 @@ const DEFAULT_POETRY_SCENES: PoetryScene[] = [
 const THEME_OPTIONS: Array<{ value: Theme; label: string; description: string }> = [
   { value: "light", label: "明亮工作台", description: "清晰、轻快的日常创作界面" },
   { value: "dark", label: "深色专业", description: "电影创作室 · 石墨与暖金" },
-  { value: "studio", label: "暖灰编辑室", description: "更适合判断图片色彩和质感" }
+  { value: "studio", label: "暖灰编辑室", description: "更适合判断图片色彩和质感" },
+  { value: "paper", label: "纸上故事馆", description: "象牙白与砖红 · 书页里的灵感" }
 ];
 function getInitialTheme(): Theme {
   const savedTheme = window.localStorage.getItem("image-assistant-theme");
-  if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "studio") return savedTheme;
+  if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "studio" || savedTheme === "paper") return savedTheme;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -1857,7 +1858,7 @@ function App() {
                     key={option.value}
                     onClick={() => { setTheme(option.value); setThemeMenuOpen(false); }}
                   >
-                    <span className={"theme-swatch " + option.value} />
+                    <span className={"theme-swatch " + option.value} aria-hidden="true"><span>文</span><i /><i /></span>
                     <span><strong>{option.label}</strong><small>{option.description}</small></span>
                     {theme === option.value && <CheckCircle2 size={15} />}
                   </button>
@@ -2033,7 +2034,7 @@ function App() {
                   <figcaption><span>{current.kind === "generate" ? "生成" : "编辑"} · {formatTime(current.createdAt)}</span><p>{current.prompt}</p></figcaption>
                 </figure>
             ) : mode === "generate" && !referenceImages.length ? (
-              <CreativeWelcome onStory={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} onPrompt={() => document.getElementById("prompt")?.focus()} onPoetry={openPoetryWorkbench} />
+              <CreativeWelcome paper={theme === "paper"} onStory={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} onPrompt={() => document.getElementById("prompt")?.focus()} onPoetry={openPoetryWorkbench} />
             ) : (
               <div className="empty-state"><span className="empty-icon"><Sparkles size={26} /></span><strong>{emptyTitle}</strong><p>填写提示词，然后在这里查看生成结果。</p></div>
             )}

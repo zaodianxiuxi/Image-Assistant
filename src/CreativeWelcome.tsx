@@ -1,6 +1,30 @@
 import { ArrowRight, BookOpen, Clapperboard, ImagePlus, Sparkles } from "lucide-react";
 
-type Props = { onStory: () => void; onPrompt: () => void; onPoetry: () => void };
+type Props = { paper?: boolean; onStory: () => void; onPrompt: () => void; onPoetry: () => void };
+
+/** A book illustration made from vectors; it is not a user's saved work. */
+function PaperBook() {
+  return <div className="paper-book" aria-hidden="true">
+    <span className="paper-book-edition">故事未完 · 灵感待续</span>
+    <div className="paper-book-spread">
+      <div className="paper-book-page paper-book-left"><span>第一章</span><strong>风经过的地方，<br />故事正在发生。</strong><i /><i /><i /><div className="paper-book-seal">故事</div><small>01</small></div>
+      <div className="paper-book-page paper-book-right">
+        <svg viewBox="0 0 180 240" fill="none">
+          <path fill="#eae5d7" d="M0 0h180v240H0z" />
+          <circle cx="126" cy="53" r="24" fill="#bc6d50" />
+          <path d="M0 112 38 91 85 126 136 82 180 108v132H0z" fill="#a4afa0" />
+          <path d="m0 151 61-43 64 47 55-18v103H0z" fill="#6c8274" />
+          <path d="M0 194c38-23 90-2 180-32v78H0z" fill="#405b51" />
+          <path d="M98 141c-48 37 76 24 12 99h39c50-70-56-69-46-99" fill="#e9d2a9" />
+          <path d="M21 0v240M28 0v240M0 33h180" stroke="#f7f2e5" strokeOpacity=".45" />
+          <circle cx="102" cy="156" r="4" fill="#3b3933" /><path d="m98 162-3 18h13l-2-18z" fill="#ad503c" /><path d="m99 180-2 11m7-11 3 11" stroke="#3b3933" strokeWidth="2" />
+        </svg>
+        <small>每一页，都有新的远方。<span>02</span></small>
+      </div>
+    </div>
+    <span className="paper-book-note">一本尚未写完的故事 · 创作示意</span>
+  </div>;
+}
 
 /** Decorative storyboard artwork, not a generated image or saved project. */
 function StoryFrames() {
@@ -31,17 +55,17 @@ function StoryFrames() {
   </div>;
 }
 
-export default function CreativeWelcome({ onStory, onPrompt, onPoetry }: Props) {
+export default function CreativeWelcome({ paper = false, onStory, onPrompt, onPoetry }: Props) {
   return <section className="creative-welcome" aria-label="开始创作">
     <div className="welcome-hero">
       <div className="welcome-copy">
-        <span className="studio-kicker"><span /> 想象力，准备开场</span>
-        <h2>让一个念头，<br />成为<span>一组画面。</span></h2>
-        <p>从一句灵感到完整故事，<br />让人物、情绪与镜头，在这里相遇。</p>
-        <button className="welcome-primary" type="button" onClick={onStory}><Clapperboard size={17} /> 开始故事创作 <ArrowRight size={17} /></button>
+        <span className="studio-kicker"><span /> {paper ? "纸上故事馆 · 翻开想象的扉页" : "想象力，准备开场"}</span>
+        <h2>{paper ? <>把心里的故事，<br />写成<span>眼前的风景。</span></> : <>让一个念头，<br />成为<span>一组画面。</span></>}</h2>
+        <p>{paper ? <>记下一闪而过的念头，<br />让文字生根，让画面慢慢展开。</> : <>从一句灵感到完整故事，<br />让人物、情绪与镜头，在这里相遇。</>}</p>
+        <button className="welcome-primary" type="button" onClick={onStory}>{paper ? <BookOpen size={17} /> : <Clapperboard size={17} />} 开始故事创作 <ArrowRight size={17} /></button>
         <small>还没有故事？让灵感助手陪你想一个。</small>
       </div>
-      <StoryFrames />
+      {paper ? <PaperBook /> : <StoryFrames />}
     </div>
     <div className="welcome-paths">
       <button type="button" onClick={onPrompt}><ImagePlus size={19} /><span><strong>定格一个想法</strong><small>描述画面，生成单张图片</small></span><ArrowRight size={16} /></button>

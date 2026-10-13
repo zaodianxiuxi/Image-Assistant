@@ -1,0 +1,170 @@
+/* Local font files are split into Unicode subsets; only visible glyphs are fetched. */
+:root {
+  --paper-sans: "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --paper-serif: "Noto Serif SC Variable", "Songti SC", "SimSun", serif;
+}
+
+/* Small page samples make the four themes easier to distinguish. */
+.theme-menu { width: min(310px, calc(100vw - 28px)); padding: 8px; gap: 5px; }
+.theme-menu button { grid-template-columns: 48px minmax(0, 1fr) 16px; gap: 12px; min-height: 72px; padding: 9px; }
+.theme-menu strong { font-size: 13px; font-weight: 600; }
+.theme-menu small { font-size: 11px; line-height: 1.6; }
+.theme-swatch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; align-content: center; width: 46px; height: 52px; border-radius: 4px; padding: 7px; border: 1px solid #80786940; box-shadow: 1px 2px 4px #0000000a; }
+.theme-swatch > span { grid-column: 1 / -1; font-size: 18px; line-height: 1.2; }
+.theme-swatch i { height: 3px; background: currentColor; opacity: .4; }
+.theme-swatch.light { color: #2463eb; background: #f6f8fb; }
+.theme-swatch.dark { color: #dfb778; background: #1a1d1c; }
+.theme-swatch.studio { color: #8b5748; background: #ece7df; }
+.theme-swatch.paper { color: #9c4635; background: #faf6ed; font-family: var(--paper-serif); }
+
+:root[data-theme="paper"] {
+  --surface-page: #f1ece2;
+  --surface-panel: #fffcf5;
+  --surface-subtle: #f3ede2;
+  --surface-canvas: #f8f3e9;
+  --text-strong: #302f2a;
+  --text-muted: #70675a;
+  --border-subtle: #d8cebd;
+  --accent: #9c4635;
+  --accent-soft: #f3e3d9;
+  --accent-ink: #fffcf5;
+  --studio-gold: #9c4635;
+  --hero-glow: #dbc5a32b;
+  --success: #3b7156;
+  --danger: #ac342c;
+  font-family: var(--paper-sans);
+  color-scheme: light;
+}
+:root[data-theme="paper"] body { font-size: 15px; line-height: 1.7; }
+:root[data-theme="paper"] :is(h1, h2, .welcome-paths strong, .story-idea h3, .story-draft h3, .story-shot header > strong, .story-dialog .manager-toolbar strong, .reader-intro > span, .poetry-toolbar strong) {
+  font-family: var(--paper-serif); font-weight: 600; letter-spacing: .035em;
+}
+:root[data-theme="paper"] :is(button, input, textarea, select) { font-family: var(--paper-sans); }
+:root[data-theme="paper"] :is(textarea, input, select) { caret-color: var(--accent); }
+:root[data-theme="paper"] :is(textarea, input)::placeholder { color: #7b7265; opacity: 1; }
+:root[data-theme="paper"] ::selection { color: var(--text-strong); background: #e8c7b8; }
+:root[data-theme="paper"] .topbar { border-bottom: 1px solid var(--border-subtle); }
+:root[data-theme="paper"] .brand { letter-spacing: .01em; font-weight: 600; }
+:root[data-theme="paper"] .brand-mark { border-radius: 3px; box-shadow: none; transform: rotate(-4deg); }
+:root[data-theme="paper"] .brand-subtitle { font-size: 11px; letter-spacing: .18em; }
+:root[data-theme="paper"] .activity-banner { font-size: 12px; }
+:root[data-theme="paper"] .control-panel { border-radius: 5px; box-shadow: 0 5px 18px #54412708; }
+:root[data-theme="paper"] .control-heading { font-size: 15px; margin-bottom: 18px; }
+:root[data-theme="paper"] .control-heading small { font-size: 9px; }
+:root[data-theme="paper"] :is(.field-label, .mode-switch button, .select-wrap select, .generate-button) { font-size: 14px; font-weight: 500; }
+:root[data-theme="paper"] .prompt-box textarea { font-size: 15px; line-height: 1.9; min-height: 165px; }
+:root[data-theme="paper"] .prompt-box textarea::placeholder { opacity: 1; }
+:root[data-theme="paper"] :is(.prompt-box, .upload-zone, .select-wrap select, .generate-button, .welcome-primary, .hotlist-item, .icon-button) { border-radius: 4px; }
+:root[data-theme="paper"] .upload-zone { font-size: 12px; }
+:root[data-theme="paper"] :is(.upload-zone small, .mask-link, .control-submit > span, .welcome-copy > small) { font-size: 11px; color: var(--text-muted); }
+:root[data-theme="paper"] :is(.hotlist-heading, .hotlist-status) { color: var(--text-muted); font-size: 12px; }
+:root[data-theme="paper"] .hotlist-item { border-width: 0 0 1px; background: transparent; padding: 12px 5px; }
+:root[data-theme="paper"] .hotlist-copy strong { font-size: 13px; line-height: 1.6; font-weight: 500; }
+:root[data-theme="paper"] :is(.hotlist-copy small, .hotlist-copy em) { color: var(--text-muted); font-size: 11px; }
+:root[data-theme="paper"] .canvas-heading { margin-bottom: 18px; }
+:root[data-theme="paper"] .canvas-heading h1 { font-size: 23px; margin-top: 5px; }
+:root[data-theme="paper"] .canvas-heading .eyebrow { font-size: 10px; color: var(--accent); letter-spacing: .2em; }
+:root[data-theme="paper"] .canvas { border-radius: 4px; }
+:root[data-theme="paper"] .canvas.is-welcome { box-shadow: 0 8px 30px #5441270a, 3px 4px 0 -1px var(--surface-panel), 3px 4px 0 0 var(--border-subtle); }
+:root[data-theme="paper"] .creative-welcome { background: radial-gradient(ellipse at 80% 40%, #dccdab33, transparent 65%), var(--surface-panel); }
+:root[data-theme="paper"] .welcome-hero { min-height: 380px; padding: 34px 30px; grid-template-columns: 1.05fr 1fr; gap: 20px; }
+:root[data-theme="paper"] .studio-kicker { font-size: 11px; letter-spacing: .12em; }
+:root[data-theme="paper"] .studio-kicker > span { width: 4px; height: 18px; border-radius: 0; box-shadow: none; }
+:root[data-theme="paper"] .welcome-copy h2 { font-size: clamp(26px, 2.45vw, 42px); line-height: 1.65; letter-spacing: .025em; margin: 20px 0 14px; }
+:root[data-theme="paper"] .welcome-copy > p { font-size: 14px; line-height: 1.95; margin-bottom: 24px; }
+:root[data-theme="paper"] .welcome-primary { font-size: 14px; padding: 12px 17px; box-shadow: 0 3px 0 #793626; }
+:root[data-theme="paper"] .welcome-paths { counter-reset: chapter; }
+:root[data-theme="paper"] .welcome-paths button { position: relative; display: block; padding: 24px 18px 20px; background: #faf6ed; }
+:root[data-theme="paper"] .welcome-paths button::before { counter-increment: chapter; content: "0" counter(chapter) " /"; display: block; margin-bottom: 10px; color: var(--accent); font: 16px Georgia, serif; }
+:root[data-theme="paper"] .welcome-paths button > svg:first-child { position: absolute; top: 24px; right: 18px; width: 17px; }
+:root[data-theme="paper"] .welcome-paths strong { font-size: 17px; }
+:root[data-theme="paper"] .welcome-paths small { font-size: 11px; line-height: 1.8; }
+:root[data-theme="paper"] .welcome-paths button:hover { background: var(--accent-soft); }
+:root[data-theme="paper"] .welcome-paths button > svg:last-child { display: none; }
+:root[data-theme="paper"] .history-heading h2 { font-size: 19px; }
+:root[data-theme="paper"] .history-empty { min-height: 80px; font-size: 13px; border-radius: 4px; }
+:root[data-theme="paper"] .canvas-panel > footer { font-size: 11px; }
+:root[data-theme="paper"] .extension-rail-heading { font-size: 11px; }
+:root[data-theme="paper"] .extension-tool { border-radius: 5px; }
+:root[data-theme="paper"] .extension-tool-label { font-size: 12px; }
+
+/* A quiet, two-page illustration, kept separate from actual generated pictures. */
+.paper-book { position: relative; width: 100%; max-width: 300px; justify-self: center; padding: 12px 0 8px; }
+.paper-book-edition { display: block; margin-bottom: 12px; color: var(--text-muted); font-size: 10px; letter-spacing: .2em; text-align: center; }
+.paper-book-spread { display: grid; grid-template-columns: 1fr 1fr; aspect-ratio: 1.23; transform: rotate(-5deg); background: #fcf8ed; border: 1px solid #cabda7; border-radius: 3px 9px 9px 3px; box-shadow: 2px 3px 0 #e4dacc, 3px 5px 0 #c5b89f, 8px 20px 28px #61513622; transition: transform .3s ease; }
+.paper-book:hover .paper-book-spread { transform: rotate(-2deg) translateY(-3px); }
+.paper-book-page { position: relative; min-width: 0; padding: 16px 12px; }
+.paper-book-left { display: flex; flex-direction: column; align-items: flex-start; background: linear-gradient(90deg, transparent 85%, #67574412); border-right: 1px solid #d8cebd; }
+.paper-book-left > span { color: #9c4635; font: 10px var(--paper-serif); letter-spacing: .2em; }
+.paper-book-left > strong { font: 600 clamp(12px, 1.15vw, 16px)/2 var(--paper-serif); color: #3b3933; margin: 18px 0; }
+.paper-book-left > i { display: block; width: 90%; height: 1px; background: #d8cebd; margin-bottom: 9px; }
+.paper-book-left > i:nth-of-type(3) { width: 60%; }
+.paper-book-seal { display: grid; place-items: center; border: 1px solid #9c4635; outline: 1px solid #9c4635; outline-offset: 2px; margin: auto 0 16px; width: 27px; height: 27px; color: #9c4635; font: 11px var(--paper-serif); transform: rotate(-8deg); }
+.paper-book-left > small { color: #70675a; font: 9px Georgia, serif; }
+.paper-book-right { display: flex; flex-direction: column; gap: 12px; background: linear-gradient(90deg, #6757440c, transparent 12%); }
+.paper-book-right > svg { display: block; width: 100%; min-height: 0; flex: 1; object-fit: contain; }
+.paper-book-right > small { display: flex; justify-content: space-between; gap: 3px; color: #70675a; font: 8px/1.6 var(--paper-serif); }
+.paper-book-note { display: block; text-align: center; font-size: 10px; color: var(--text-muted); margin-top: 18px; }
+
+/* Story pages, previews and utility drawers share the same paper and ink. */
+:root[data-theme="paper"] :is(.story-dialog, .poetry-dialog, .api-settings-dialog, .manager-dialog) { border-radius: 4px 0 0 4px; }
+:root[data-theme="paper"] .poetry-dialog { display: flex; flex-direction: column; }
+:root[data-theme="paper"] .poetry-toolbar { flex-shrink: 0; }
+:root[data-theme="paper"] .poetry-body { flex: 1; min-height: 0; height: auto; }
+:root[data-theme="paper"] :is(.story-dialog .manager-toolbar, .reader-toolbar, .poetry-toolbar) { background: var(--surface-panel); border-bottom: 1px solid var(--border-subtle); }
+:root[data-theme="paper"] .story-dialog .manager-toolbar strong { font-size: 25px; }
+:root[data-theme="paper"] .story-body { background: var(--surface-canvas); }
+:root[data-theme="paper"] .story-section { padding: 30px 0; }
+:root[data-theme="paper"] .story-section h2 { font-size: 22px; border-left: 3px solid var(--accent); padding-left: 12px; }
+:root[data-theme="paper"] :is(.story-dialog label, .story-dialog summary) { font-size: 13px; }
+:root[data-theme="paper"] :is(.story-dialog textarea, .story-dialog input:not([type=file]), .story-dialog select) { border-radius: 4px; font-size: 15px; line-height: 1.9; }
+:root[data-theme="paper"] :is(.story-section p, .story-idea p, .story-help) { font-size: 14px; line-height: 1.9; }
+:root[data-theme="paper"] :is(.story-dialog button, .story-upload, .reader-toolbar button, .reader-navigation button) { border-radius: 4px; font-size: 13px; }
+:root[data-theme="paper"] :is(.story-reference, .story-shot, .story-idea, .reader-frame) { border-radius: 4px; box-shadow: 2px 3px 0 #d8cebd3d; }
+:root[data-theme="paper"] .story-shot header > strong { font-size: 19px; }
+:root[data-theme="paper"] .story-dialog .story-inspiration { border-radius: 4px; background: var(--surface-panel); border-style: dashed; }
+:root[data-theme="paper"] .story-chapters > div { border-radius: 3px; background: var(--surface-panel); }
+:root[data-theme="paper"] .story-chapters > div.current { background: var(--accent-soft); }
+:root[data-theme="paper"] .story-chapters strong { font-size: 14px; }
+:root[data-theme="paper"] :is(.story-chapters small, .story-progress > div, .story-project-bar > small) { font-size: 12px; }
+:root[data-theme="paper"] .story-dialog .shot-revisions { border-radius: 4px; }
+:root[data-theme="paper"] :is(.shot-version > p, .version-comparison-heading p) { font-size: 13px; }
+:root[data-theme="paper"] .reader-intro > span { font-size: 30px; }
+:root[data-theme="paper"] :is(.reader-intro p, .reader-caption p) { font-size: 16px; line-height: 2; }
+:root[data-theme="paper"] .reader-caption h2 { font-size: 23px; }
+:root[data-theme="paper"] .reader-frame-heading { font-size: 12px; }
+:root[data-theme="paper"] :is(.reader-image, .reader-placeholder) { border-radius: 2px; }
+:root[data-theme="paper"] .reader-screen .reader-image > img { max-height: max(180px, calc(100dvh - 390px)); }
+:root[data-theme="paper"] .reader-screen .reader-placeholder { min-height: max(180px, calc(100dvh - 390px)); }
+:root[data-theme="paper"] :is(.manager-search input, .library-item, .series-entry, .node-entry, .storyboard-form textarea) { color: var(--text-strong); background: var(--surface-panel); border-color: var(--border-subtle); }
+:root[data-theme="paper"] :is(.poetry-input-section textarea, .poetry-analysis input, .poetry-analysis textarea, .poetry-scene textarea) { font-size: 15px; line-height: 1.9; background: var(--surface-panel); border-radius: 4px; }
+:root[data-theme="paper"] :is(.poetry-analysis-heading > div > strong, .poetry-scene-heading > strong) { font-family: var(--paper-serif); font-size: 19px; }
+:root[data-theme="paper"] .poetry-toolbar strong { font-size: 23px; }
+
+@media (min-width: 1500px) {
+  :root[data-theme="paper"] .welcome-hero { padding: 44px; min-height: 440px; gap: 32px; }
+}
+@media (min-width: 851px) and (max-width: 1100px) {
+  :root[data-theme="paper"] .welcome-hero { grid-template-columns: 1fr; padding: 28px; }
+  .paper-book { max-width: 260px; }
+}
+@media (max-width: 850px) {
+  :root[data-theme="paper"] .canvas-panel:has(.canvas.is-welcome) { order: -1; }
+  :root[data-theme="paper"] .control-panel { max-height: none; }
+  :root[data-theme="paper"] .story-chapters strong { font-size: 12px; }
+  :root[data-theme="paper"] .story-chapters small { font-size: 11px; }
+}
+@media (max-width: 520px) {
+  .theme-menu { right: 0; }
+  :root[data-theme="paper"] .welcome-hero { grid-template-columns: 1fr; padding: 28px 24px; gap: 14px; }
+  :root[data-theme="paper"] .welcome-copy h2 { font-size: 29px; }
+  :root[data-theme="paper"] .canvas-heading h1 { font-size: 20px; }
+  :root[data-theme="paper"] .welcome-paths button { padding: 20px 24px; }
+  :root[data-theme="paper"] .brand-subtitle { font-size: 9px; }
+  :root[data-theme="paper"] .extension-tool-label { font-size: 10px; }
+  .paper-book { max-width: 280px; padding-top: 12px; }
+  .paper-book-left > strong { font-size: 14px; }
+  :root[data-theme="paper"] .reader-intro > span { font-size: 24px; }
+  :root[data-theme="paper"] .reader-caption h2 { font-size: 20px; }
+  :root[data-theme="paper"] .story-section h2 { font-size: 20px; }
+}
