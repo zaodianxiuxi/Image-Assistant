@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ArrowLeft, ArrowRight, BookOpen, Clapperboard, ImageOff, Maximize2, Pencil, X } from "lucide-react";
 import type { StoryProject } from "./story-project-store";
 import type { StoryResult, StoryShot } from "./storyboard-continuity.mjs";
+import StoryExport from "./StoryExport";
 import "./story-reader.css";
 
 function ShotImage({ shot, result }: { shot: StoryShot; result?: StoryResult }) {
@@ -49,10 +50,12 @@ export default function StoryReader({ project, inputChanged, onClose, onEdit }: 
 
   return createPortal(<dialog ref={dialog} className={`story-reader reader-${mode}`} aria-labelledby="story-reader-title" onCancel={e => { e.preventDefault(); onClose(); }} onKeyDown={e => {
     if (e.key === "Escape") { e.stopPropagation(); return; }
+    if ((e.target as HTMLElement).closest('.reader-export')) return;
     if (mode !== "screen" || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); navigate(activeIndex + (e.key === "ArrowRight" ? 1 : -1)); }
   }}>
     <header className="reader-toolbar"><div><span className="reader-kicker">STORY SCREENING</span><h1 id="story-reader-title">{project.plan?.title || project.title}</h1><small>{shots.length} 镜 · {completed} 镜画面已就绪</small></div><div className="reader-toolbar-actions"><div className="reader-modes" aria-label="预览方式"><button type="button" aria-pressed={mode === "read"} onClick={() => { setMode("read"); content.current?.scrollTo({ top: 0 }); }}><BookOpen size={15} />连续阅读</button><button type="button" aria-pressed={mode === "screen"} onClick={() => { setMode("screen"); navigate(activeIndex); }}><Maximize2 size={15} />全屏翻看</button></div><button type="button" className="reader-close" aria-label="关闭故事成片预览" onClick={onClose}><X size={21} /></button></div></header>
+    <StoryExport project={project} inputChanged={inputChanged} />
     {inputChanged && <p className="reader-version-warning" role="status">故事或风格已修改。这里展示的是上次规划的分镜，请返回工作台重新规划后再检查。</p>}
     <div className="reader-content" ref={content}>
       {mode === "read" && <div className="reader-intro"><Clapperboard size={24} /><span>故事成片预览</span><p>{project.plan?.synopsis}</p><small>按镜头顺序阅读，看看情绪和动作是否自然接续。</small></div>}

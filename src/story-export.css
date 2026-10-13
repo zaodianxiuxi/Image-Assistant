@@ -1,0 +1,16 @@
+.reader-export { flex-shrink: 0; padding: 10px 32px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-panel); }
+.reader-export-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.reader-export-actions > span { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
+.reader-export-actions > a { display: inline-flex; gap: 5px; align-items: center; color: var(--accent); font-size: 12px; padding: 8px; }
+.reader-export-note, .reader-export-status, .reader-export-error { margin: 7px 0 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.reader-export-note { color: var(--text-muted); }
+.reader-export-status { display: flex; align-items: center; gap: 7px; color: var(--accent); }
+.reader-export-error { color: var(--danger); }
+.export-spinner { flex-shrink: 0; animation: rotate 1.1s linear infinite; }
+.story-reader.reader-screen .reader-image > img { max-height: max(160px, calc(100dvh - 480px)); }
+:root[data-theme="paper"] .story-reader.reader-screen .reader-image > img { max-height: max(160px, calc(100dvh - 520px)); }
+@media (max-width: 650px) {
+  .reader-export { padding: 10px 16px; }
+  .reader-export-actions > span { width: 100%; margin: 0; }
+  .reader-export-note, .reader-export-status, .reader-export-error { font-size: 11px; }
+}
