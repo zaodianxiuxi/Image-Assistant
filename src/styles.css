@@ -624,3 +624,17 @@ body { font-size: 14px; line-height: 1.55; }
   .poetry-scene-list { grid-template-columns: 1fr; }
   .poetry-actions button.primary { flex: 1; }
 }
+
+/* Constrain image tracks before resolving percentage image sizes. Without an
+   explicit track, portrait images contribute their intrinsic height to the grid. */
+.result-preview-trigger,
+.history-item > button,
+.image-preview-media {
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+.result-preview-trigger img,
+.history-item img,
+.image-preview-media img {
+  min-width: 0;
+  min-height: 0;
+}
