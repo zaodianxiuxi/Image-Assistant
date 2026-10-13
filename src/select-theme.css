@@ -1,0 +1,126 @@
+/* Keep native selection, keyboard navigation and top-layer positioning while
+   styling the picker in browsers that support customizable selects. */
+@supports (appearance: base-select) {
+  :root select,
+  :root select::picker(select) {
+    appearance: base-select;
+  }
+
+  :root select {
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    max-width: 100%;
+    cursor: pointer;
+    color: var(--text-strong);
+    background: var(--surface-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+
+  :root select:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
+  }
+
+  :root select:focus-visible,
+  :root select:open {
+    border-color: var(--accent);
+    outline: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    outline-offset: 2px;
+  }
+
+  :root select:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+  }
+
+  :root select::picker-icon {
+    content: "";
+    flex: 0 0 7px;
+    width: 7px;
+    height: 7px;
+    margin: 0 3px 3px 8px;
+    border-right: 1.5px solid var(--text-muted);
+    border-bottom: 1.5px solid var(--text-muted);
+    transform: rotate(45deg);
+    transition: transform .15s ease;
+  }
+
+  :root select:open::picker-icon {
+    transform: translateY(3px) rotate(225deg);
+  }
+
+  :root select::picker(select) {
+    min-inline-size: anchor-size(self-inline);
+    max-inline-size: min(420px, calc(100vw - 24px));
+    max-block-size: min(340px, 50dvh);
+    margin-block: 6px;
+    padding: 5px;
+    overflow: auto;
+    color: var(--text-strong);
+    background: var(--surface-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px #00000020, 0 2px 6px #0000000a;
+    font: inherit;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-subtle) transparent;
+  }
+
+  :root select option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-strong);
+    background: transparent;
+    font: inherit;
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  :root select option:checked {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-panel));
+    font-weight: 600;
+  }
+
+  :root select option:hover,
+  :root select option:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface-panel));
+  }
+
+  :root select option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: var(--accent);
+  }
+
+  :root select option:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  .select-wrap > svg { display: none; }
+  .select-wrap select { padding-right: 12px; }
+  .select-wrap .ratio-preview { right: 37px; }
+
+  :root[data-theme="paper"] select::picker(select) {
+    border-radius: 6px;
+    box-shadow: 0 12px 30px #54412724, 0 2px 6px #5441270a;
+  }
+
+  :root[data-theme="paper"] select option { border-radius: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root select,
+    :root select::picker-icon { transition: none; }
+  }
+}

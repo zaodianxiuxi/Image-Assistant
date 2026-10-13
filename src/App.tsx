@@ -1828,7 +1828,13 @@ function App() {
   const activeStep = executionStage === "validating" ? 0 : executionStage === "sending" ? 1 : 2;
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" onKeyDownCapture={(event) => {
+      // Escape dismisses an open native picker before the enclosing workbench.
+      if (event.key === "Escape" && CSS.supports("selector(:open)") &&
+          event.target instanceof Element && event.target.closest("select")?.matches(":open")) {
+        event.stopPropagation();
+      }
+    }}>
       <header className="topbar">
         <a className="brand" href="/" aria-label="Image Assistant 首页">
           <span className="brand-mark"><WandSparkles size={19} /></span>

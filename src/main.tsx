@@ -6,6 +6,7 @@ import "./cinema-workspace.css";
 import "@fontsource-variable/noto-sans-sc";
 import "@fontsource-variable/noto-serif-sc";
 import "./paper-theme.css";
+import "./select-theme.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
