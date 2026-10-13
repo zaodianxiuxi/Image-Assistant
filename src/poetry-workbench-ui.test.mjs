@@ -60,16 +60,8 @@ test("provides a poetry interpretation workbench and per-scene image generation"
   assert.ok(source.includes("poetryPromptSupplement"));
   assert.ok(source.includes("poetryCharacterBible"));
   assert.ok(source.includes("poetryContinuityGuide"));
-  assert.ok(source.includes("POETRY_IMAGE_QUALITY_GUIDE"));
-  assert.match(source, /整体曝光充足、主体面部和服装细节清晰可见/);
-  assert.match(source, /低噪点、低数字噪声/);
-  assert.ok(source.includes("function buildPoetryScenePrompt(scene: PoetryScene)"));
   assert.ok(source.includes("function findPreviousPoetryResult(scene: PoetryScene, collection: PoetryCollection)"));
   assert.ok(source.includes('fetch("/api/images/edit", { method: "POST", body: form })'));
-  assert.ok(source.includes("以上一段已生成图片作为唯一视觉参考"));
-  assert.ok(source.includes("前序分镜提示词"));
-  assert.ok(source.includes("item.prompt.slice(0, 1200)"));
-  assert.ok(source.includes("join(\"\\n\").slice(0, 9000)"));
   assert.ok(source.includes("poetryStyleGuide, poetryCharacterBible, poetryContinuityGuide"));
   assert.ok(source.includes("function getPoetryCollectionName(poem: string)"));
   assert.ok(source.includes("function ensurePoetryCollection()"));

@@ -13,10 +13,13 @@ const STORYBOARD_SYSTEM_PROMPT = [
   "只返回 JSON 对象，格式为 {\"styleGuide\":\"...\",\"characterBible\":\"...\",\"continuityGuide\":\"...\",\"scenes\":[...]}，不要 Markdown 或额外解释。",
   "必须依据用户提供的结构化诗意分析，把诗词拆成连续的画面段落，不得背离逐句释义、情绪线或存疑说明。",
   "每个 scene 必须有 title、sourceLine、mood、prompt 四个字段：title 不超过 16 个汉字；sourceLine 指出对应的诗句或意象；mood 用一句话说明这一段的情绪；prompt 是 80 到 600 个汉字、可以直接用于图像生成的完整中文画面提示词。",
-  "prompt 要具体描述主体、人物外貌与动作、环境、空间层次、季节时辰、天气、色彩、材质、光线、镜头和构图，把抽象意境转成可视化画面；不要只复述诗句，不要出现画幅、比例、尺寸、分辨率等信息。",
-  "先输出 characterBible，明确固定主角的身份、年龄、性别、脸型、发型、肤色、体型、服装颜色材质款式、配饰、固定道具、时代背景和不可改变项；如果诗中没有人物，也要明确主要主体和固定视觉锚点。",
-  "再输出 continuityGuide，明确所有分镜必须继承的角色、服装、发型、道具、时代、画风、色彩、镜头和空间关系；时间推进只允许合理的光线或动作变化，禁止随意换装、换发型、改变年龄、道具、画风或摄影质感。",
-  "每个 scene 的 prompt 都必须显式重复 characterBible 中的固定人物描述，不要只写‘同一人物’；第 2 段及之后还要明确承接上一段的空间、人物动作、服装、道具、光线和情绪，并把前序提示词中的关键连续性信息带入当前 prompt。styleGuide 用一句话总结统一视觉风格。"
+  "每镜只选一个主意象、一个可见瞬间和两三个有意义的细节，prompt 建议 100–220 字。交代视点、主体位置、真实光源与空间关系；不要机械填满所有要素，不出现画幅、尺寸信息，不描述推镜、交错呈现或一个画面内的时间变化。",
+  "默认采用自然写实摄影，避免古装写真、旅游宣传照、游戏渲染、夸张光柱、过饱和与过锐化；用户给出水墨等偏好时，从分镜开始遵循该媒介，不混搭相互矛盾的风格。styleGuide 简洁说明媒介、光线和色彩。",
+  "诗意通过留白、远近、遮挡、动静对照和微小物理细节表达。愁不等于皱眉，孤独不等于每镜站一个人，风用芦苇、衣角或水纹表现，声音用声源或环境痕迹暗示。虚实、回忆与典故不必全部实体化；不确定的史实不添加具体宫殿或道具。",
+  "characterBible 只记录确有必要反复出现的人物特征，纯写景允许为空；不要自动安排诗人出镜。无人物的空镜不重复人物描述，有人物时只描述当前可见的特征与自然动作，不要求每次露出清晰面部。",
+  "continuityGuide 保持时代、季节及同一人物的衣着身份，允许随诗意换景、改变机位、远近和虚实时空。组镜以情绪和意象呼应为主，避免把所有诗词写成主人公连续走路的故事。",
+  "每个 scene 另有 referenceMode 字段，取 independent 或 continuation。首镜、换景、回忆、无人物空镜默认 independent；只有与紧邻上一镜同一地点同一时刻、确有需要保留视觉身份时使用 continuation。不要连续复制上一镜构图。",
+  "输出前逐镜自检：是否忠于诗意、是否只含一个瞬间、主体是否必要、光照和动作是否可信、与相邻镜是否有节奏变化；发现摆拍或意象堆砌时在内部改写，不输出检查过程。"
 ].join("");
 
 function normalize(value) {
@@ -193,7 +196,8 @@ export function validatePoetryScenes(value, expectedCount) {
       throw new Error("文本模型返回了不完整或重复的诗词画面段落。");
     }
     seenTitles.add(title);
-    return { sceneOrder: index + 1, title, sourceLine, mood, prompt };
+    const referenceMode = index > 0 && item.referenceMode === "continuation" ? "continuation" : "independent";
+    return { sceneOrder: index + 1, title, sourceLine, mood, prompt, referenceMode };
   });
 }
 
@@ -214,7 +218,7 @@ export async function analyzePoetry({ apiBase, apiKey, model, poem, fetchImpl = 
   return validatePoetryAnalysis(parsed);
 }
 
-export async function generatePoetryScenes({ apiBase, apiKey, model, poem, analysis, sceneCount = 6, fetchImpl = fetch }) {
+export async function generatePoetryScenes({ apiBase, apiKey, model, poem, analysis, sceneCount = 6, promptSupplement = "", fetchImpl = fetch }) {
   if (!model) throw new Error("未配置 SUDOCODE_TEXT_MODEL，无法解析诗词意境。");
   if (!apiKey) throw new Error("未配置 SUDOCODE_API_KEY，无法解析诗词意境。");
   const normalizedPoem = normalize(poem);
@@ -226,7 +230,7 @@ export async function generatePoetryScenes({ apiBase, apiKey, model, poem, analy
     apiKey,
     model,
     systemPrompt: STORYBOARD_SYSTEM_PROMPT,
-    userPrompt: `请根据下面经过确认的完整诗意分析，把原诗拆成恰好 ${count} 个连续画面段落。必须同时参考译文、注释、创作背景、历史语境、结构分析、表现手法、感官线索和逐句理解，不得只根据主题或表面关键词联想。\n诗词原文：\n${normalizedPoem}\n完整诗意分析：\n${JSON.stringify(validatedAnalysis)}`,
+    userPrompt: `请根据下面经过确认的完整诗意分析，把原诗拆成恰好 ${count} 个画面段落，以情绪和意象组织节奏，允许空镜和转场。参考译文、感官线索和逐句理解，不把所有注释与典故塞进画面。\n创作偏好：\n${normalize(promptSupplement).slice(0, 4000) || "自然写实、含蓄留白、真实光线，避免摆拍。"}\n诗词原文：\n${normalizedPoem}\n完整诗意分析：\n${JSON.stringify(validatedAnalysis)}`,
     temperature: 0.7,
     fetchImpl
   });

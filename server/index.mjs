@@ -501,7 +501,8 @@ app.post("/api/poetry/interpret", async (req, res) => {
       model: process.env.SUDOCODE_TEXT_MODEL,
       poem: req.body?.poem,
       analysis: req.body?.analysis,
-      sceneCount: req.body?.sceneCount
+      sceneCount: req.body?.sceneCount,
+      promptSupplement: req.body?.promptSupplement
     });
     res.json(result);
   } catch (error) {

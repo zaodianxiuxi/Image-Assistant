@@ -46,13 +46,14 @@ test("turns a poem into validated visual scenes", async () => {
     poem: "孤舟蓑笠翁，独钓寒江雪。",
     analysis: VALID_ANALYSIS,
     sceneCount: 4,
+    promptSupplement: "淡彩水墨，空镜留白",
     fetchImpl: async (_url, options) => {
       const body = JSON.parse(options.body);
       assert.match(body.messages[1].content, /恰好 4 个/);
       assert.match(body.messages[1].content, /经过确认的完整诗意分析/);
       assert.match(body.messages[1].content, /天地寂静中的孤高与坚守/);
-      assert.match(body.messages[0].content, /禁止随意换装/);
-      assert.match(body.messages[0].content, /重复 characterBible/);
+      assert.match(body.messages[1].content, /淡彩水墨，空镜留白/);
+      assert.match(body.messages[0].content, /纯写景允许为空/);
       return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ styleGuide: "统一冷青灰冬日电影质感。", characterBible: "固定中年文士，青色长袍、黑色幞头。", continuityGuide: "后续分镜禁止换装。", scenes: scenes(4) }) } }] }), { status: 200 });
     }
   });
@@ -113,4 +114,13 @@ test("retries transient poetry gateway timeouts", async () => {
   });
   assert.equal(result.title, VALID_ANALYSIS.title);
   assert.equal(attempts, 2);
+});
+
+
+test("normalizes reference modes and always starts independently", () => {
+  const candidates = scenes(4);
+  candidates[0].referenceMode = "continuation";
+  candidates[1].referenceMode = "continuation";
+  candidates[2].referenceMode = "unknown";
+  assert.deepEqual(validatePoetryScenes(candidates, 4).map(s => s.referenceMode), ["independent", "continuation", "independent", "independent"]);
 });

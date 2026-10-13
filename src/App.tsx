@@ -35,6 +35,7 @@ import type { PromptHotlistItem } from "./prompt-hotlist.mjs";
 import { groupHistoryRecords } from "./gallery-groups.mjs";
 import { enrichSessionVersion, markSessionDelivery } from "./image-version-session.mjs";
 import { ImageRequestError, retryPoetryImageRequest } from "./poetry-image-retry.mjs";
+import { buildPoetryImagePrompt, canReferencePoetryImage } from "./poetry-image-prompt.mjs";
 import StyleWorkbench from "./StyleWorkbench";
 import StoryWorkbench from "./StoryWorkbench";
 import CreativeWelcome from "./CreativeWelcome";
@@ -78,7 +79,7 @@ type LibraryPrompt = {
 };
 type SeriesRecord = { id: number; name: string; description?: string; global_prompt?: string; style_prompt?: string };
 type SeriesNode = { id: number; series_id: number; node_order: number; title: string; story_text?: string; prompt?: string; status: string };
-type PoetryScene = { sceneOrder: number; title: string; sourceLine: string; mood: string; prompt: string };
+type PoetryScene = { sceneOrder: number; title: string; sourceLine: string; mood: string; prompt: string; referenceMode?: "independent" | "continuation" };
 type PoetryLineReading = { sourceLine: string; meaning: string; emotion: string; visualFocus: string };
 type PoetryAllusion = { sourceText: string; explanation: string; confidence: "high" | "medium" | "low" };
 type PoetryAnnotation = { term: string; explanation: string };
@@ -132,10 +133,9 @@ const SIZES = [
 
 const MAX_REFERENCE_IMAGES = 10;
 const STORYBOARD_STYLE_PREFIX = "遵循故事本身的时代与视觉设定，人物专注于当前动作，表情自然，保持角色身份和道具连续，按当前分镜调整构图与机位。";
-const DEFAULT_POETRY_STYLE_GUIDE = "整体采用唐代长安旧都的历史氛围，统一为黄昏到入夜前的冷暖交替色调，人物为同一位中年文士，青色圆领长袍、黑色幞头、浅灰旧氅衣，始终以电影感写实水墨风呈现，强调高城、渭水、荒苑、秋叶、风雨与远眺的连续空间关系。";
-const POETRY_IMAGE_QUALITY_GUIDE = "画质与曝光要求：保持诗意氛围但整体曝光充足、主体面部和服装细节清晰可见，阴影保留层次，不要欠曝、死黑或灰暗糊成一片；画面干净锐利、低噪点、低数字噪声，仅保留轻微细腻且不影响细节的胶片颗粒，避免重颗粒、脏污、色带和低清晰度。";
-const DEFAULT_POETRY_CHARACTER_BIBLE = "固定主角：同一位中年男性文士，面容清瘦、眉骨分明、肤色偏白、黑色长发束于黑色幞头，体型修长。固定服装：青色圆领长袍，外罩浅灰旧氅衣，深色腰带与布靴；固定配饰与道具：木簪、旧竹简和木栏，不可改变年龄、脸型、发型、服装颜色材质款式、配饰、道具和唐代身份。";
-const DEFAULT_POETRY_CONTINUITY_GUIDE = "连续性锁定：所有分镜使用同一位中年文士、同一套青色圆领长袍与浅灰旧氅衣、黑色幞头、同一时代和写实电影感水墨摄影。后续只允许风雨、光线、姿态和场景位置随诗句推进而变化，禁止换衣服、换发型、改变年龄体型、替换固定道具或切换画风、色彩和镜头质感。";
+const DEFAULT_POETRY_STYLE_GUIDE = "唐代咸阳城暮色中的自然写实摄影。天空散射光逐渐减弱，草木保留自然色差，远景随水汽减淡，木石有真实磨损。构图疏朗，以景物和距离传达情绪，避免舞台灯光和古装写真。";
+const DEFAULT_POETRY_CHARACTER_BIBLE = "登楼镜中的文士：中年男性，青色圆领长袍、黑色幞头，衣料朴素。人物以背影或远景出现，不刻意展示面容；其他写景镜头无需人物，不添加固定手持道具。";
+const DEFAULT_POETRY_CONTINUITY_GUIDE = "同一秋日黄昏，保持唐代环境和自然材质。文士只在分镜要求时出现，衣着身份一致；空镜不添加人物。允许在城楼、远处草木和渭水之间换景，以风势、暮色和距离呼应诗意，不强行让人物到达每处景物。";
 const DEFAULT_POETRY_ANALYSIS: PoetryAnalysis = {
   title: "咸阳城东楼",
   author: "许浑",
@@ -170,12 +170,12 @@ const DEFAULT_POETRY_ANALYSIS: PoetryAnalysis = {
   uncertainties: ["“似汀洲”是否明确指向诗人的江南乡愁，历来可有不同解释；画面可保留水岸联想，不必指定确切故乡。"]
 };
 const DEFAULT_POETRY_SCENES: PoetryScene[] = [
-  { sceneOrder: 1, title: "登城远愁", sourceLine: "一上高城万里愁", mood: "初登城楼，胸中先起的是辽阔而无法排遣的乡国之愁。", prompt: "唐代长安咸阳城东高城之上，一位中年文士刚登上城楼，身着青色圆领长袍、黑色幞头、浅灰旧氅衣，手扶木栏凭高远望，面容清瘦、眉宇紧锁。城楼砖石斑驳，檐角沉重，远处城郭层叠、道路细若游丝。暮色初临，天光尚未尽暗，风从高处掠过衣袖与衣带，空气里带着秋凉。镜头从背后中景推进到半身近景，突出人物孤身与辽阔空间的对比，色彩以灰蓝、土黄、暗青为主，渲染初上高楼便生出的万里愁思。" },
-  { sceneOrder: 2, title: "汀洲蒹葭", sourceLine: "蒹葭杨柳似汀洲", mood: "眼前荒城外的芦苇杨柳，把人引向遥远水边的漂泊联想。", prompt: "城东楼外视野展开，低处是一片临水湿地，蒹葭成丛、杨柳低垂，秋风吹动芦穗与柳丝，远看如江汀洲渚。前景仍可见文士倚栏的侧影，目光越过城墙望向城外河岸。地面有浅浅水洼，倒映残霞与草木，层次由近处城楼砖石过渡到中景芦苇，再到远处平静水面和模糊天际。夕阳余晖压低，光线柔和而偏冷，画面静中含远，借芦苇与杨柳写出漂泊、故土与水岸记忆交织的情绪。" },
-  { sceneOrder: 3, title: "云起日沉", sourceLine: "溪云初起日沉阁", mood: "云气升起、落日西沉，时间在迅速滑向更深的暮色。", prompt: "城楼侧面与远处溪谷同框，天边一轮夕日正缓缓沉入城阁后方，溪上薄云初起，沿着低处水道向城下漫开。文士仍立在楼上，半侧身回望天际，衣袍被风掀起一角。画面上方是被云层切开的残红与灰紫天空，中间是高阁剪影，下面是蜿蜒溪流、石岸与稀疏枯草，空间层次分明。镜头采用略仰拍广角，突出日沉阁后的压迫感与时光流逝感，光线由金红转为暗橙再到青灰，空气里有秋日将尽的凉意。" },
-  { sceneOrder: 4, title: "山雨满楼", sourceLine: "山雨欲来风满楼", mood: "风势骤紧，暴雨未落而压抑已至，天地间充满不安的预兆。", prompt: "咸阳城东楼内部与檐外交错呈现，风猛烈灌入楼中，帘幕翻卷，木窗轻颤，桌上竹简与袖口被吹得微动。文士立于楼内近窗处，神情凝重，抬眼望向远处山色，天际乌云翻滚，山脊被阴影压低，雨脚尚未落下，却已让空气潮重。外景可见城外山峦暗沉、林木摇摆、飞尘与落叶卷起，楼檐下水气弥漫。镜头以室内中景带出外景广域，强调风从四面涌来的包围感，色调转为墨绿、深灰、铁青，营造山雨欲来的紧迫与时代风声。" },
-  { sceneOrder: 5, title: "秦苑夕鸟", sourceLine: "鸟下绿芜秦苑夕", mood: "荒苑暮色中，飞鸟归下，昔日繁华只剩衰草与空旷。", prompt: "镜头转向城外旧秦苑遗址，暮色压在大片绿芜之上，荒草齐腰，断墙残阶隐没其间。几只飞鸟从低空掠下，落向枯木与荒台，画面中不见宫人，只见废苑空阔与风吹草动。远景里宫阙轮廓已模糊，前景是潮湿草叶与散乱石块，中景是残破台基与稀疏灌木，背景是渐暗天空。文士可在画面边缘远远驻足，像是在凭吊旧迹。镜头平视拉开，强调鸟下与荒芜相映的空寂感，光线为落日最后一点余辉与草地冷绿交错，呈现盛衰更替的历史苍凉。" },
-  { sceneOrder: 6, title: "汉宫秋水", sourceLine: "蝉鸣黄叶汉宫秋 / 行人莫问当年事 / 故国东来渭水流", mood: "秋声、落叶与流水共同指向往昔帝业，感伤最终沉入无可挽回的历史长流。", prompt: "渭水岸边与汉宫旧址远远相连，深秋时节，梧桐与杨树黄叶纷落，几处残败宫墙在暮霭中若隐若现，空中有蝉鸣却更显寂寥。前景是一位路过的行人，与此前登楼的文士同为青色圆领长袍、黑色幞头，却神色更为怅惘，缓步停在水边，不发一言，只望着东来的渭水缓缓流过旧都。中景是斑驳宫阙、枯草与落叶，远景是河面反射最后一线暗金天光，水流向东延伸至画面尽头。镜头采用横向长景别，人物置于一侧，空出大面积河水与废墟，强调“莫问当年事”的沉默与“故国东来”的时间洪流感，整体色彩以黄褐、深青、灰黑为主，电影感写实，带淡淡水汽与历史沧桑。" }
+  { sceneOrder: 1, title: "登城远愁", sourceLine: "一上高城万里愁", mood: "人的渺小与远方的辽阔形成无言的愁绪。", prompt: "唐代咸阳城东楼，视点在一位青袍文士身后稍远处。人物仅占画面左下小部分，一只手松搭在磨旧木栏上，背向镜头望向远处。栏外河岸与低矮屋舍逐层没入灰蓝暮气，大半画面留给遥远天际。夕照已经很弱，衣褶处于自然阴影里，无须看清面容。只有衣角被高处的风轻轻掀动，人物没有刻意摆姿势。" },
+  { sceneOrder: 2, title: "汀洲蒹葭", sourceLine: "蒹葭杨柳似汀洲", mood: "熟悉的水岸景物唤起远方的记忆。", prompt: "从高处遥望城外浅水洲渚，一片芦苇沿弯曲水线生长，远岸几棵柳树枝条朝同一方向轻偏。前景只有一小段虚化的旧木栏，视线落在低处被风压出纹路的水面。芦穗灰白，柳叶暗绿，水面保留微弱天光，远处湿地边界渐渐融入薄霭。空镜，无人物，不把城楼、芦苇和河岸压缩到同一距离。" },
+  { sceneOrder: 3, title: "云起日沉", sourceLine: "溪云初起日沉阁", mood: "最后的日光正在被云层和楼阁遮去。", prompt: "远望黄昏中的楼阁和低处水道。夕日只剩一小段暗橙色弧边露在阁后，水边云气刚刚升起，尚未遮满天空。屋檐作为偏右的暗色轮廓，左侧天空留出宽阔灰青空间，几缕云缘受到微弱暖光。没有人物，没有耀眼光束与烈焰般晚霞，保留日暮时真实而柔和的明暗差。" },
+  { sceneOrder: 4, title: "山雨满楼", sourceLine: "山雨欲来风满楼", mood: "风已经进楼，雨尚未落下，安静中有紧迫感。", prompt: "固定视点从咸阳城楼一扇敞开的木窗向外看。窗边一角素布帘被风吹离窗框，旧木表面可见磨损，远处树梢朝同一方向倾斜。山脊上方低云变厚，天光呈青灰色，室内自然比室外暗。雨还没有落下，地面无雨水反光。构图只保留窗、帘和远山，空镜，用帘角的张力表达风势，不添加翻飞书卷或舞台烟雾。" },
+  { sceneOrder: 5, title: "秦苑夕鸟", sourceLine: "鸟下绿芜秦苑夕", mood: "归鸟的一点动静，让荒地更显空寂。", prompt: "暮色中的旧苑草地，一只归鸟刚落向低矮灌木，另一只停在枝头，鸟在画面里很小。草木高低不齐，石阶痕迹大部分埋在草中，不复原宏大宫殿。平视中远景，焦点在归鸟附近，前景草叶略虚，远处树线被暮气淡化。自然暗绿和土褐色，天空只留窄窄一线灰光，无人物。" },
+  { sceneOrder: 6, title: "汉宫秋水", sourceLine: "蝉鸣黄叶汉宫秋 / 行人莫问当年事 / 故国东来渭水流", mood: "历史的感伤留在画外，河水仍然流动。", prompt: "秋日将尽的暮色里，视点停在渭水岸边。近处几片初黄的树叶垂入画面一角，中远处河面宽阔，细小水纹接住灰蓝天光，彼岸草木渐淡。主体是仍在流动的水，画面保留大片低对比的安静空间，岸边没有凭吊摆拍的人物，也没有具象化的帝王幻影。以近叶和远水暗示秋声与时间，不在单张图里堆叠全部诗句。" }
 ];
 const THEME_OPTIONS: Array<{ value: Theme; label: string; description: string }> = [
   { value: "light", label: "明亮工作台", description: "清晰、轻快的日常创作界面" },
@@ -428,8 +428,8 @@ function App() {
     setPoetryPromptSupplement(project.promptSupplement || "");
     setPoetryAnalysis(hydratePoetryAnalysis(project.analysis));
     setPoetryStyleGuide(project.styleGuide || "");
-    setPoetryCharacterBible(project.characterBible || DEFAULT_POETRY_CHARACTER_BIBLE);
-    setPoetryContinuityGuide(project.continuityGuide || DEFAULT_POETRY_CONTINUITY_GUIDE);
+    setPoetryCharacterBible(project.characterBible || "");
+    setPoetryContinuityGuide(project.continuityGuide || "");
     setPoetryScenes(Array.isArray(project.scenes) ? project.scenes : []);
     setPoetrySceneGenerationStates({});
     setPoetryImageProgress({ status: "idle", completed: 0, total: 0, currentTitle: "" });
@@ -1237,15 +1237,15 @@ function App() {
       const response = await fetch("/api/poetry/interpret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ poem: poemText.trim(), sceneCount: poetrySceneCount, analysis: poetryAnalysis })
+        body: JSON.stringify({ poem: poemText.trim(), sceneCount: poetrySceneCount, analysis: poetryAnalysis, promptSupplement: poetryPromptSupplement.trim() })
       });
       if (!response.ok) throw new Error(await readApiError(response));
       const data = await response.json();
       if (!Array.isArray(data.scenes) || !data.scenes.length) throw new Error("没有得到可用的诗词画面段落。");
       setPoetryScenes(data.scenes);
       setPoetryStyleGuide(typeof data.styleGuide === "string" ? data.styleGuide : "");
-      const characterBible = typeof data.characterBible === "string" && data.characterBible.trim() ? data.characterBible : DEFAULT_POETRY_CHARACTER_BIBLE;
-      const continuityGuide = typeof data.continuityGuide === "string" && data.continuityGuide.trim() ? data.continuityGuide : DEFAULT_POETRY_CONTINUITY_GUIDE;
+      const characterBible = typeof data.characterBible === "string" ? data.characterBible : "";
+      const continuityGuide = typeof data.continuityGuide === "string" ? data.continuityGuide : "";
       setPoetryCharacterBible(characterBible);
       setPoetryContinuityGuide(continuityGuide);
       await savePoetryProject({ overrides: { analysis: poetryAnalysis, scenes: data.scenes, styleGuide: typeof data.styleGuide === "string" ? data.styleGuide : "", characterBible, continuityGuide } });
@@ -1304,35 +1304,20 @@ function App() {
     return collection;
   }
 
-  function buildPoetryScenePrompt(scene: PoetryScene) {
-    const previousScenes = poetryScenes
-      .filter((item) => item.sceneOrder < scene.sceneOrder)
-      .sort((a, b) => a.sceneOrder - b.sceneOrder);
-    const previousPrompt = previousScenes.length
-      ? "前序分镜提示词（必须继承其中的人物外貌、服装、发型、道具、时代、画风和空间关系，只允许按当前诗句推进动作、天气与光线）：\n" + previousScenes.map((item) => "第" + item.sceneOrder + "段《" + item.title + "》：" + item.prompt.slice(0, 1200)).join("\n").slice(0, 9000)
-      : "这是首段画面，请建立并固定角色与视觉锚点，供后续分镜继承。";
-    return [
-      poetryStyleGuide,
-      poetryCharacterBible,
-      poetryContinuityGuide,
-      poetryPromptSupplement.trim(),
-      POETRY_IMAGE_QUALITY_GUIDE,
-      previousPrompt,
-      "当前分镜提示词：" + scene.prompt
-    ].filter(Boolean).join("\n");
+  function buildPoetryScenePrompt(scene: PoetryScene, hasReference = false) {
+    return buildPoetryImagePrompt({ scene, styleGuide: poetryStyleGuide, characterBible: poetryCharacterBible,
+      continuityGuide: poetryContinuityGuide, supplement: poetryPromptSupplement, hasReference });
   }
 
   function findPreviousPoetryResult(scene: PoetryScene, collection: PoetryCollection) {
     return history
-      .filter((item) => item.seriesId === collection.series.id && Number(item.nodeOrder) < scene.sceneOrder)
+      .filter((item) => canReferencePoetryImage(scene, item, collection.series.id))
       .sort((a, b) => Number(b.nodeOrder || 0) - Number(a.nodeOrder || 0) || b.createdAt.getTime() - a.createdAt.getTime())[0] || null;
   }
 
   async function generatePoetrySceneImage(scene: PoetryScene, collection: PoetryCollection, previousResult: Result | null = null) {
-    const basePrompt = buildPoetryScenePrompt(scene);
-    const promptText = previousResult
-      ? basePrompt + "\n以上一段已生成图片作为唯一视觉参考，必须保持人物身份、脸型、发型、服装、材质、画风、色彩、镜头质感和空间连续性，只根据当前诗句改变动作、天气、光线或景物。"
-      : basePrompt;
+    if (!canReferencePoetryImage(scene, previousResult, collection.series.id)) previousResult = null;
+    const promptText = buildPoetryScenePrompt(scene, Boolean(previousResult));
     const node = collection.nodesByOrder.get(scene.sceneOrder);
     if (!node) throw new Error("诗词画面节点未创建，请重试。");
     let response: Response;
@@ -2153,7 +2138,8 @@ function App() {
                 <textarea id="poem-input" value={poemText} onChange={(event) => handlePoemTextChange(event.target.value)} placeholder="粘贴整首诗词或多句诗文，例如：春江潮水连海平，海上明月共潮生……" rows={5} />
                 <p className="poetry-collection-note"><FolderKanban size={14} />图片合集：{getPoetryCollectionName(poemText)}</p>
                 <label htmlFor="poetry-prompt-supplement">整体提示词补充</label>
-                <textarea id="poetry-prompt-supplement" value={poetryPromptSupplement} onChange={(event) => setPoetryPromptSupplement(event.target.value)} placeholder="例如：真实感手机，90年代摄像机真实拍摄效果，35mm复古胶片实拍质感" rows={3} />
+                <textarea id="poetry-prompt-supplement" value={poetryPromptSupplement} onChange={(event) => setPoetryPromptSupplement(event.target.value)} placeholder="例如：自然写实，保留暮色与远景薄雾，多用空镜，以水纹、风和草木表达情绪，避免古装摆拍。也可以指定淡彩水墨等风格。" rows={3} />
+                <p className="poetry-direction-note">偏好会参与分镜与出图。默认自然写实，每镜抓住一个意象；修改偏好后可重新生成分镜，建议先试一张。已有项目的旧提示词会保留。</p>
                 <div className="poetry-actions">
                   <label htmlFor="poetry-scene-count">画面段数</label>
                   <select id="poetry-scene-count" value={poetrySceneCount} onChange={(event) => setPoetrySceneCount(Number(event.target.value))}>
@@ -2257,8 +2243,8 @@ function App() {
                   </div>
                 </section>
               )}
-              {(poetryStyleGuide || poetryCharacterBible || poetryContinuityGuide) && <div className="poetry-continuity-panel">
-                <div className="poetry-style-guide"><strong>统一视觉：</strong>{poetryStyleGuide || "未设置"}</div>
+              {(poetryAnalysis || poetryScenes.length > 0) && <div className="poetry-continuity-panel">
+                <label><span>统一视觉</span><textarea aria-label="诗词统一视觉" value={poetryStyleGuide} onChange={(event) => setPoetryStyleGuide(event.target.value)} rows={2} placeholder="选择一种清晰的视觉方向，例如自然写实或淡彩水墨" /></label>
                 <label><span>角色设定锁</span><textarea aria-label="角色设定锁" value={poetryCharacterBible} onChange={(event) => setPoetryCharacterBible(event.target.value)} rows={3} placeholder="固定人物外貌、服装、发型、配饰和道具" /></label>
                 <label><span>连续性规则</span><textarea aria-label="连续性规则" value={poetryContinuityGuide} onChange={(event) => setPoetryContinuityGuide(event.target.value)} rows={3} placeholder="规定后续画面必须继承的设定" /></label>
               </div>}
@@ -2270,6 +2256,7 @@ function App() {
                       <div className="poetry-scene-heading"><span>{String(scene.sceneOrder).padStart(2, "0")}</span><strong>{scene.title}</strong><button type="button" onClick={() => void generateOnePoetryScene(scene)} disabled={poetryLoading || poetrySingleGenerating || poetryBatchGenerating} title={(generationState?.status === "error" ? "重新生成" : "生成") + scene.title} aria-label={(generationState?.status === "error" ? "重新生成" : "生成") + scene.title}>{generationState?.status === "running" ? <LoaderCircle className="spin" size={14} /> : generationState?.status === "error" ? <RotateCcw size={14} /> : <Sparkles size={14} />}</button></div>
                       <p className="poetry-source">{scene.sourceLine}</p>
                       <p className="poetry-mood">{scene.mood}</p>
+                      <label className="poetry-reference-mode">画面衔接<select aria-label={scene.title + "画面衔接"} value={scene.referenceMode || "independent"} disabled={index === 0 || poetryLoading || poetrySingleGenerating || poetryBatchGenerating} onChange={(event) => setPoetryScenes(items => items.map((item, itemIndex) => itemIndex === index ? { ...item, referenceMode: event.target.value as PoetryScene["referenceMode"] } : item))}><option value="independent">独立构图 · 适合空镜与换景</option><option value="continuation">延续上一镜 · 同场景参考</option></select></label>
                       <textarea aria-label={scene.title + "画面提示词"} value={scene.prompt} onChange={(event) => setPoetryScenes((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, prompt: event.target.value } : item))} rows={4} />
                       {generationState && <div className={"poetry-scene-generation-status " + generationState.status}>
                         {generationState.status === "running" && <LoaderCircle className="spin" size={13} />}

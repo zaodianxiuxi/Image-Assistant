@@ -535,7 +535,8 @@ function normalizePoetryProject(input) {
     title: String(scene?.title || "画面 " + (index + 1)).trim().slice(0, 160),
     sourceLine: String(scene?.sourceLine || "").trim().slice(0, 500),
     mood: String(scene?.mood || "").trim().slice(0, 500),
-    prompt: String(scene?.prompt || "").trim().slice(0, 12000)
+    prompt: String(scene?.prompt || "").trim().slice(0, 12000),
+    referenceMode: index > 0 && scene?.referenceMode === "continuation" ? "continuation" : "independent"
   }));
   return {
     title,
