@@ -502,7 +502,8 @@ app.post("/api/poetry/interpret", async (req, res) => {
       poem: req.body?.poem,
       analysis: req.body?.analysis,
       sceneCount: req.body?.sceneCount,
-      promptSupplement: req.body?.promptSupplement
+      promptSupplement: req.body?.promptSupplement,
+      imageQuality: req.body?.imageQuality
     });
     res.json(result);
   } catch (error) {

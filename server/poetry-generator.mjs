@@ -1,3 +1,5 @@
+import { applyImageQuality } from "../src/image-quality.mjs";
+
 const ANALYSIS_SYSTEM_PROMPT = [
   "你是一名严谨的中国古典诗词研究者。",
   "只返回 JSON 对象，不要 Markdown 或额外解释。",
@@ -218,7 +220,7 @@ export async function analyzePoetry({ apiBase, apiKey, model, poem, fetchImpl = 
   return validatePoetryAnalysis(parsed);
 }
 
-export async function generatePoetryScenes({ apiBase, apiKey, model, poem, analysis, sceneCount = 6, promptSupplement = "", fetchImpl = fetch }) {
+export async function generatePoetryScenes({ apiBase, apiKey, model, poem, analysis, sceneCount = 6, promptSupplement = "", imageQuality = "original", fetchImpl = fetch }) {
   if (!model) throw new Error("未配置 SUDOCODE_TEXT_MODEL，无法解析诗词意境。");
   if (!apiKey) throw new Error("未配置 SUDOCODE_API_KEY，无法解析诗词意境。");
   const normalizedPoem = normalize(poem);
@@ -230,7 +232,7 @@ export async function generatePoetryScenes({ apiBase, apiKey, model, poem, analy
     apiKey,
     model,
     systemPrompt: STORYBOARD_SYSTEM_PROMPT,
-    userPrompt: `请根据下面经过确认的完整诗意分析，把原诗拆成恰好 ${count} 个画面段落，以情绪和意象组织节奏，允许空镜和转场。参考译文、感官线索和逐句理解，不把所有注释与典故塞进画面。\n创作偏好：\n${normalize(promptSupplement).slice(0, 4000) || "自然写实、含蓄留白、真实光线，避免摆拍。"}\n诗词原文：\n${normalizedPoem}\n完整诗意分析：\n${JSON.stringify(validatedAnalysis)}`,
+    userPrompt: `请根据下面经过确认的完整诗意分析，把原诗拆成恰好 ${count} 个画面段落，以情绪和意象组织节奏，允许空镜和转场。参考译文、感官线索和逐句理解，不把所有注释与典故塞进画面。\n创作偏好：\n${applyImageQuality(normalize(promptSupplement).slice(0, 4000), imageQuality) || "自然写实、含蓄留白、真实光线，避免摆拍。"}\n诗词原文：\n${normalizedPoem}\n完整诗意分析：\n${JSON.stringify(validatedAnalysis)}`,
     temperature: 0.7,
     fetchImpl
   });

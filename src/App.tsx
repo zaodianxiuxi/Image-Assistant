@@ -36,6 +36,8 @@ import { groupHistoryRecords } from "./gallery-groups.mjs";
 import { enrichSessionVersion, markSessionDelivery } from "./image-version-session.mjs";
 import { ImageRequestError, retryPoetryImageRequest } from "./poetry-image-retry.mjs";
 import { buildPoetryImagePrompt, canReferencePoetryImage } from "./poetry-image-prompt.mjs";
+import { applyImageQuality, normalizeImageQuality, type ImageQuality } from "./image-quality.mjs";
+import ImageQualityControl from "./ImageQualityControl";
 import StyleWorkbench from "./StyleWorkbench";
 import StoryWorkbench from "./StoryWorkbench";
 import CreativeWelcome from "./CreativeWelcome";
@@ -274,6 +276,14 @@ function App() {
   const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
   const [size, setSize] = useState(SIZES[0].value);
+  const [imageQuality, setImageQuality] = useState<ImageQuality>(() => {
+    try { return normalizeImageQuality(window.localStorage.getItem("image-assistant-image-quality")); }
+    catch { return "balanced"; }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem("image-assistant-image-quality", imageQuality); }
+    catch { /* The current selection remains usable when browser storage is unavailable. */ }
+  }, [imageQuality]);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [maskFile, setMaskFile] = useState<File | null>(null);
   const [maskPreview, setMaskPreview] = useState("");
@@ -1237,7 +1247,7 @@ function App() {
       const response = await fetch("/api/poetry/interpret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ poem: poemText.trim(), sceneCount: poetrySceneCount, analysis: poetryAnalysis, promptSupplement: poetryPromptSupplement.trim() })
+        body: JSON.stringify({ poem: poemText.trim(), sceneCount: poetrySceneCount, analysis: poetryAnalysis, promptSupplement: poetryPromptSupplement.trim(), imageQuality })
       });
       if (!response.ok) throw new Error(await readApiError(response));
       const data = await response.json();
@@ -1306,7 +1316,7 @@ function App() {
 
   function buildPoetryScenePrompt(scene: PoetryScene, hasReference = false) {
     return buildPoetryImagePrompt({ scene, styleGuide: poetryStyleGuide, characterBible: poetryCharacterBible,
-      continuityGuide: poetryContinuityGuide, supplement: poetryPromptSupplement, hasReference });
+      continuityGuide: poetryContinuityGuide, supplement: poetryPromptSupplement, hasReference, quality: imageQuality });
   }
 
   function findPreviousPoetryResult(scene: PoetryScene, collection: PoetryCollection) {
@@ -1673,6 +1683,7 @@ function App() {
     setExecutionStage("validating");
     setRequestStartedAt(Date.now());
     const operation: Mode = referenceImages.length ? "edit" : "generate";
+    const effectivePrompt = applyImageQuality(prompt, imageQuality, mode);
     logClientEvent("generate_clicked", {
       promptChars: prompt.trim().length,
       referenceCount: referenceImages.length,
@@ -1693,7 +1704,7 @@ function App() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt,
+            prompt: effectivePrompt,
             size,
             title: versionParent?.nodeTitle || activeNode?.title || undefined,
             seriesName: versionParent?.seriesName || activeSeries?.name || undefined,
@@ -1713,7 +1724,7 @@ function App() {
         setActivityStatus("图片模型正在根据参考图生成，请稍候...");
         response = await requestImageWithRetry(() => {
           const form = new FormData();
-          form.append("prompt", prompt);
+          form.append("prompt", effectivePrompt);
           form.append("size", size);
           if (versionParent?.nodeTitle || activeNode?.title) form.append("title", versionParent?.nodeTitle || activeNode?.title || "");
           if (versionParent?.seriesName || activeSeries?.name) form.append("seriesName", versionParent?.seriesName || activeSeries?.name || "");
@@ -1743,7 +1754,7 @@ function App() {
         nodeId: versionParent?.nodeId ?? activeNode?.id,
         nodeTitle: versionParent?.nodeTitle ?? activeNode?.title,
         nodeOrder: versionParent?.nodeOrder ?? activeNode?.node_order,
-        prompt: data.revisedPrompt || prompt,
+        prompt: data.revisedPrompt || effectivePrompt,
         kind: operation,
         createdAt: new Date(),
         versionId: data.versionId || null,
@@ -1893,7 +1904,7 @@ function App() {
               </div>
             </div>
             <div className="prompt-box">
-              <textarea id="prompt" value={prompt} onChange={(event) => handlePromptChange(event.target.value)} placeholder={referenceImages.length || mode === "edit" ? "描述希望保留或修改什么，例如：把天空换成黄昏..." : "例如：黄昏的旧车站，一个提着行李的人，停在最后一束光里。温暖胶片质感。"} rows={5} />
+              <textarea id="prompt" value={prompt} onChange={(event) => handlePromptChange(event.target.value)} placeholder={referenceImages.length || mode === "edit" ? "描述希望保留或修改什么，例如：把天空换成黄昏..." : "例如：雨后的小巷，一只橘猫蹲在窗台上，树叶间透进柔和日光。简单说清主体、环境和想要的感觉就好。"} rows={5} />
               <span>{prompt.length} / 4000</span>
             </div>
 
@@ -1944,6 +1955,7 @@ function App() {
               <div className={`ratio-preview ratio-${selectedSize.value.replace("x", "-")}`} aria-label={`当前画幅：${selectedSize.name}`} />
             </div>
             {referenceImages.length > 0 && <p className="reference-note canvas-note">参考图仅提供内容和风格参考，输出将按所选画幅生成。</p>}
+            {mode === "generate" && <ImageQualityControl value={imageQuality} onChange={setImageQuality} disabled={loading || poetryLoading || poetrySingleGenerating || poetryBatchGenerating} />}
 
             {error && <p className="form-error" role="alert">{error}</p>}
             {!apiReady && <p className="setup-note"><KeyRound size={15} /> <button className="setup-link" type="button" onClick={openApiSettings}>配置 API Key</button></p>}
@@ -2137,9 +2149,10 @@ function App() {
                 <label htmlFor="poem-input">诗词原文</label>
                 <textarea id="poem-input" value={poemText} onChange={(event) => handlePoemTextChange(event.target.value)} placeholder="粘贴整首诗词或多句诗文，例如：春江潮水连海平，海上明月共潮生……" rows={5} />
                 <p className="poetry-collection-note"><FolderKanban size={14} />图片合集：{getPoetryCollectionName(poemText)}</p>
-                <label htmlFor="poetry-prompt-supplement">整体提示词补充</label>
-                <textarea id="poetry-prompt-supplement" value={poetryPromptSupplement} onChange={(event) => setPoetryPromptSupplement(event.target.value)} placeholder="例如：自然写实，保留暮色与远景薄雾，多用空镜，以水纹、风和草木表达情绪，避免古装摆拍。也可以指定淡彩水墨等风格。" rows={3} />
-                <p className="poetry-direction-note">偏好会参与分镜与出图。默认自然写实，每镜抓住一个意象；修改偏好后可重新生成分镜，建议先试一张。已有项目的旧提示词会保留。</p>
+                <ImageQualityControl value={imageQuality} onChange={setImageQuality} disabled={loading || poetryLoading || poetrySingleGenerating || poetryBatchGenerating} />
+                <label htmlFor="poetry-prompt-supplement">整体提示词补充（可选）</label>
+                <textarea id="poetry-prompt-supplement" value={poetryPromptSupplement} onChange={(event) => setPoetryPromptSupplement(event.target.value)} placeholder="可以留空。也可以补充：淡彩水墨、多用空镜，以水纹、风和草木表达情绪。" rows={3} />
+                <p className="poetry-direction-note">画面观感与单图共用，参与分镜和出图。旧分镜已有的光线与画风描述会保留；想整体调整时，可重新生成分镜，再先试一张。</p>
                 <div className="poetry-actions">
                   <label htmlFor="poetry-scene-count">画面段数</label>
                   <select id="poetry-scene-count" value={poetrySceneCount} onChange={(event) => setPoetrySceneCount(Number(event.target.value))}>

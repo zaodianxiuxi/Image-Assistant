@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { analyzePoetry, generatePoetryScenes, validatePoetryAnalysis, validatePoetryScenes } from "./poetry-generator.mjs";
+import { applyImageQuality } from "../src/image-quality.mjs";
 
 const VALID_ANALYSIS = {
   title: "江雪",
@@ -63,6 +64,23 @@ test("turns a poem into validated visual scenes", async () => {
   assert.equal(result.characterBible, "固定中年文士，青色长袍、黑色幞头。");
   assert.equal(result.continuityGuide, "后续分镜禁止换装。");
   assert.equal(/16:9|9:16|1:1/.test(result.scenes[0].prompt), false);
+});
+
+test("long legacy supplements retain the complete selected quality in planning", async () => {
+  for (const imageQuality of ["balanced", "bright", "original"]) {
+    let sentPrompt;
+    await generatePoetryScenes({
+      apiBase: "https://example.test/v1", apiKey: "test-key", model: "test-model",
+      poem: "江雪", analysis: VALID_ANALYSIS, sceneCount: 4,
+      promptSupplement: "水墨".repeat(2500), imageQuality,
+      fetchImpl: async (_url, options) => {
+        sentPrompt = JSON.parse(options.body).messages[1].content;
+        return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ scenes: scenes(4) }) } }] }));
+      }
+    });
+    assert.ok(sentPrompt.includes(applyImageQuality("水墨".repeat(2000), imageQuality)));
+    if (imageQuality === "original") assert.doesNotMatch(sentPrompt, /【出图偏好】/);
+  }
 });
 
 test("analyzes a poem before generating storyboard prompts", async () => {
