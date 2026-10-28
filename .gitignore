@@ -9,3 +9,6 @@ dist/
 # Impeccable: local executable and developer-only preferences
 .agents/skills/impeccable/scripts/bin/
 .impeccable/config.local.json
+
+# Local workbench files and optional conversion engines
+.local/

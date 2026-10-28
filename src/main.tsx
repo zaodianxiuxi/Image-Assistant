@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import Workbench from "./workbench/Workbench";
 import "./styles.css";
 import "./cinema-workspace.css";
 import "@fontsource-variable/noto-sans-sc";
@@ -12,6 +12,6 @@ import "./journey.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Workbench />
   </StrictMode>
 );

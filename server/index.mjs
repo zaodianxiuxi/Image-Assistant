@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import express from "express";
 import multer from "multer";
+import { createWorkbenchRouter } from "./workbench/router.mjs";
 import { getDesktopAppDirectory } from "./desktop-path.mjs";
 import { isSafeGeneratedImageFileName, saveProviderImage } from "./generated-image-store.mjs";
 import { readPromptCache, validatePromptCandidates, writePromptCache } from "./prompt-cache.mjs";
@@ -54,6 +55,7 @@ const envFile = process.env.IMAGE_ASSISTANT_ENV_FILE || path.join(path.dirname(f
 let generatedImageDirectoryPromise;
 
 app.use(express.json({ limit: "1mb" }));
+app.use("/api/workbench", createWorkbenchRouter());
 
 function log(event, details = {}) {
   console.log(`[image-api] ${JSON.stringify({ time: new Date().toISOString(), event, ...details })}`);
