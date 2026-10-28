@@ -43,7 +43,7 @@ test("opens generated and history images in a resilient preview with a saved the
 
   assert.match(source, /function openPreview\(result: Result\)/);
   assert.match(source, /onClick=\{\(\) => openPreview\(current\)\}/);
-  assert.match(source, /onClick=\{\(\) => \{ setCurrent\(item\); openPreview\(item\); \}\}/);
+  assert.match(source, /onClick=\{\(\) => \{ leavePresentation\?\.\(\); setCurrent\(item\); openPreview\(item\); \}\}/);
   assert.match(source, /onError=\{handleImageError\}/);
   assert.match(source, /图片加载失败/);
   assert.match(source, /role="dialog"/);
@@ -134,7 +134,7 @@ test("renders saved images in a series and node hierarchy", async () => {
   assert.match(source, /group\.nodes\.map/);
   assert.match(source, /className="gallery-node-groups"/);
   assert.match(source, /className="gallery-node-group"/);
-  assert.match(source, /node\.items\.map\(renderHistoryItem\)/);
+  assert.match(source, /node\.items\.map\(item => renderHistoryItem\(item\)\)/);
   assert.match(styles, /\.gallery-node-groups/);
   assert.match(styles, /\.gallery-node-heading/);
 });

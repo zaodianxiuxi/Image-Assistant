@@ -7,6 +7,8 @@ import "@fontsource-variable/noto-sans-sc";
 import "@fontsource-variable/noto-serif-sc";
 import "./paper-theme.css";
 import "./select-theme.css";
+import "./creation-space.css";
+import "./journey.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

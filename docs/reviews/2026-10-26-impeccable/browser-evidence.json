@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-26",
+  "scope": "Frontend only; backend 3001 unavailable; no model calls",
+  "reviewMethod": "single-context; read-only browser DOM; no live overlay injection",
+  "storyFocus": {
+    "afterOpening": {
+      "activeText": "开始故事创作",
+      "insideDialog": false
+    },
+    "afterTab": {
+      "activeText": "定格一个想法描述画面，生成单张图片",
+      "insideDialog": false
+    }
+  },
+  "poetryFocus": {
+    "activeLabel": "打开诗词意境工作台",
+    "insideDialog": false
+  },
+  "mobileViewport": {
+    "width": 390,
+    "height": 844,
+    "contentWidth": 375
+  },
+  "mobilePaper": {
+    "promptTop": 1774.8375,
+    "generateTop": 2547.9875,
+    "canvasHeight": 1400.3375
+  },
+  "mobileLight": {
+    "promptTop": 340.3,
+    "generateTop": 1051.3
+  },
+  "poetryAnalysis": {
+    "editableFields": 44,
+    "height": 4477.6001,
+    "actionsTop": 947.2
+  },
+  "smallTargets": {
+    "saveHeight": 17.05,
+    "maskHeight": 15.5,
+    "refreshHeight": 24,
+    "themeToggle": 32,
+    "storyClose": 32
+  },
+  "validation": {
+    "testsPassed": 127,
+    "testsFailed": 0,
+    "buildExit": 0,
+    "detectorExit": 2,
+    "detectorFindings": 3
+  }
+}

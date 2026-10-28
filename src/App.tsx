@@ -41,6 +41,7 @@ import ImageQualityControl from "./ImageQualityControl";
 import StyleWorkbench from "./StyleWorkbench";
 import StoryWorkbench from "./StoryWorkbench";
 import CreativeWelcome from "./CreativeWelcome";
+import SeriesJourney from "./SeriesJourney";
 
 type Mode = "generate" | "edit";
 type ExecutionStage = "idle" | "validating" | "sending" | "processing" | "completed" | "failed";
@@ -274,6 +275,7 @@ function DownloadButton({ src, filename = "image-assistant.png" }: { src: string
 
 function App() {
   const [mode, setMode] = useState<Mode>("generate");
+  const [singleCreationStarted, setSingleCreationStarted] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [size, setSize] = useState(SIZES[0].value);
   const [imageQuality, setImageQuality] = useState<ImageQuality>(() => {
@@ -682,7 +684,10 @@ function App() {
     () => new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date()),
     []
   );
+  const [journeyGroupKey, setJourneyGroupKey] = useState<string | null>(null);
+  const [journeyNotice, setJourneyNotice] = useState("");
   const groupedHistory = useMemo(() => groupHistoryRecords(history), [history]);
+  const journeyGroup = groupedHistory.find(group => group.key === journeyGroupKey);
 
   useEffect(() => {
     if (galleryCollapseInitialized.current || historyLoading || !groupedHistory.length) return;
@@ -704,6 +709,17 @@ function App() {
       }
     };
   }, [activePoetryProjectId, poetryOpen, poemText, poetrySceneCount, size, poetryPromptSupplement, poetryAnalysis, poetryStyleGuide, poetryCharacterBible, poetryContinuityGuide, poetryScenes, poetryLoading, poetrySingleGenerating, poetryBatchGenerating]);
+
+  function startSingleCreation() {
+    setMode("generate");
+    setSingleCreationStarted(true);
+    setActivityStatus("已进入单图创作。描述画面、选择画幅后，点击生成图片。");
+    setActivityTone("idle");
+    const input = document.getElementById("prompt");
+    input?.focus({ preventScroll: true });
+    // The welcome scene shrinks after this click; scroll after React updates the layout.
+    requestAnimationFrame(() => input?.scrollIntoView({ block: "center", behavior: "instant" }));
+  }
 
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
@@ -1601,10 +1617,12 @@ function App() {
       setCurrent((item) => item && String(item.versionGroupId) === String(result.versionGroupId) ? { ...item, isDelivery: item.versionId === result.versionId } : item);
       setPreview((item) => item && String(item.versionGroupId) === String(result.versionGroupId) ? { ...item, isDelivery: item.versionId === result.versionId } : item);
       setActivityStatus("已将该版本设为当前交付版本。");
+      if (journeyGroupKey) setJourneyNotice("已将该版本设为当前交付版本。");
       setActivityTone("success");
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "设置交付版本失败。";
       setError(message);
+      if (journeyGroupKey) setJourneyNotice("设置交付版本失败：" + message);
       setActivityStatus(message);
       setActivityTone("error");
     }
@@ -1781,10 +1799,10 @@ function App() {
     }
   }
 
-  function renderHistoryItem(item: Result) {
+  function renderHistoryItem(item: Result, leavePresentation?: () => void) {
     return (
       <article className="history-item" key={item.id}>
-        <button type="button" onClick={() => { setCurrent(item); openPreview(item); }} aria-label={"预览生成记录：" + item.prompt}>
+        <button type="button" onClick={() => { leavePresentation?.(); setCurrent(item); openPreview(item); }} aria-label={"预览生成记录：" + item.prompt}>
           {failedImageSources.has(item.src)
             ? <span className="history-image-error">图片加载失败</span>
             : <img key={item.id + "-" + (imageRetries[item.src] || 0)} src={getImageSource(item.src)} data-image-source={item.src} alt={item.prompt} onError={handleImageError} />}
@@ -1798,7 +1816,7 @@ function App() {
         )}
         <p className="history-prompt" title={item.prompt}>{item.prompt}</p>
         <div className="history-actions">
-          <button className="history-edit-button" type="button" onClick={() => void continueEditing(item)}>
+          <button className="history-edit-button" type="button" onClick={() => { leavePresentation?.(); void continueEditing(item); }}>
             <Eraser size={13} /> 继续编辑
           </button>
           {item.versionId && !item.isDelivery && (
@@ -2012,10 +2030,11 @@ function App() {
 
         <section className="canvas-panel">
           <div className="canvas-heading">
-            <div><span className="eyebrow">YOUR CREATIVE SPACE</span><h1>{current ? "最新生成结果" : "今天，想讲一个什么故事？"}</h1></div>
+            <div><span className="eyebrow">YOUR CREATIVE SPACE</span><h1>{current ? "最新生成结果" : singleCreationStarted && mode === "generate" ? "单图创作" : "创作空间"}</h1></div>
             {current && <DownloadButton src={current.src} filename={current.fileName || "image-assistant.png"} />}
+            {singleCreationStarted && !current && !loading && mode === "generate" && <button className="space-text-action" type="button" onClick={() => { setSingleCreationStarted(false); setActivityStatus("准备就绪，可以开始创作。"); }}>返回创作首页</button>}
           </div>
-          <div className={`canvas ${current ? "has-result" : !loading && mode === "generate" && !referenceImages.length ? "is-welcome" : ""}`}>
+          <div className={`canvas ${current ? "has-result" : !loading && !singleCreationStarted && mode === "generate" && !referenceImages.length ? "is-welcome" : ""}`}>
             {loading ? (
               <div className="loading-state">
                 <span className="loader-ring"><Sparkles size={23} /></span>
@@ -2036,8 +2055,8 @@ function App() {
                   )}
                   <figcaption><span>{current.kind === "generate" ? "生成" : "编辑"} · {formatTime(current.createdAt)}</span><p>{current.prompt}</p></figcaption>
                 </figure>
-            ) : mode === "generate" && !referenceImages.length ? (
-              <CreativeWelcome paper={theme === "paper"} onStory={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} onPrompt={() => document.getElementById("prompt")?.focus()} onPoetry={openPoetryWorkbench} />
+            ) : !singleCreationStarted && mode === "generate" && !referenceImages.length ? (
+              <CreativeWelcome preview={history[0] ? { src: getImageSource(history[0].src), alt: history[0].prompt } : undefined} paper={theme === "paper"} onStory={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} onPrompt={startSingleCreation} onPoetry={openPoetryWorkbench} />
             ) : (
               <div className="empty-state"><span className="empty-icon"><Sparkles size={26} /></span><strong>{emptyTitle}</strong><p>填写提示词，然后在这里查看生成结果。</p></div>
             )}
@@ -2059,6 +2078,7 @@ function App() {
                                 <strong>{group.title}</strong>
                               </button>
                               <span>{group.nodes.reduce((total, node) => total + node.items.length, 0)} 张</span>
+                              {group.nodes.some(node => node.nodeId !== null && Number.isFinite(node.nodeOrder) && node.items.length > 0) && <button type="button" className="gallery-journey-button" onClick={() => { setJourneyNotice(""); setJourneyGroupKey(group.key); }} aria-label={"路径展映：" + group.title}>路径展映</button>}
                             </div>
                             {!groupCollapsed && <div className="gallery-node-groups">
                               {group.nodes.map((node) => (
@@ -2075,7 +2095,7 @@ function App() {
                                           </button>
                                           <span>{node.items.length} 张</span>
                                         </div>
-                                        {!nodeCollapsed && <div className="history-grid">{node.items.map(renderHistoryItem)}</div>}
+                                        {!nodeCollapsed && <div className="history-grid">{node.items.map(item => renderHistoryItem(item))}</div>}
                                       </>
                                     );
                                   })()}
@@ -2104,7 +2124,7 @@ function App() {
             <Search size={20} />
             <span className="extension-tool-label">提示词库</span>
           </button>
-          <button className="extension-tool story-tool" type="button" onClick={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} title="系列创作" aria-label="打开系列创作" data-label="系列创作">
+          <button className="extension-tool story-tool" type="button" onClick={() => { setStoryWorkbenchOpen(true); setSeriesOpen(false); setLibraryOpen(false); setPoetryOpen(false); }} title="故事创作" aria-label="打开故事创作" data-label="故事创作">
             <FolderKanban size={20} />
             <span className="extension-tool-label">故事创作</span>
           </button>
@@ -2345,6 +2365,8 @@ function App() {
           </section>
         </div>
       )}
+      {journeyGroup && <SeriesJourney notice={journeyNotice} group={journeyGroup} onClose={() => setJourneyGroupKey(null)} renderItem={item => renderHistoryItem(item, () => setJourneyGroupKey(null))} />}
+
       <StoryWorkbench
         open={storyWorkbenchOpen}
         onClose={() => setStoryWorkbenchOpen(false)}

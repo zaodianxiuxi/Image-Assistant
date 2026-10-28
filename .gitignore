@@ -5,3 +5,7 @@ dist/
 .env
 .env.local
 *.log
+
+# Impeccable: local executable and developer-only preferences
+.agents/skills/impeccable/scripts/bin/
+.impeccable/config.local.json

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, BookOpen, Clapperboard, ImageOff, Maximize2, Pencil, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Clapperboard, ImageOff, Maximize2, Pencil, Route, X } from "lucide-react";
 import type { StoryProject } from "./story-project-store";
 import type { StoryResult, StoryShot } from "./storyboard-continuity.mjs";
+import JourneyTimeline from "./JourneyTimeline";
 import StoryExport from "./StoryExport";
 import "./story-reader.css";
 
@@ -18,7 +19,7 @@ type Props = { project: StoryProject; inputChanged: boolean; onClose: () => void
 export default function StoryReader({ project, inputChanged, onClose, onEdit }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"read" | "screen">("read");
+  const [mode, setMode] = useState<"read" | "screen" | "path">("read");
   const [index, setIndex] = useState(0);
   const shots = project.plan?.shots || [];
   const activeIndex = Math.min(index, Math.max(0, shots.length - 1));
@@ -54,12 +55,12 @@ export default function StoryReader({ project, inputChanged, onClose, onEdit }: 
     if (mode !== "screen" || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); navigate(activeIndex + (e.key === "ArrowRight" ? 1 : -1)); }
   }}>
-    <header className="reader-toolbar"><div><span className="reader-kicker">STORY SCREENING</span><h1 id="story-reader-title">{project.plan?.title || project.title}</h1><small>{shots.length} 镜 · {completed} 镜画面已就绪</small></div><div className="reader-toolbar-actions"><div className="reader-modes" aria-label="预览方式"><button type="button" aria-pressed={mode === "read"} onClick={() => { setMode("read"); content.current?.scrollTo({ top: 0 }); }}><BookOpen size={15} />连续阅读</button><button type="button" aria-pressed={mode === "screen"} onClick={() => { setMode("screen"); navigate(activeIndex); }}><Maximize2 size={15} />全屏翻看</button></div><button type="button" className="reader-close" aria-label="关闭故事成片预览" onClick={onClose}><X size={21} /></button></div></header>
+    <header className="reader-toolbar"><div><span className="reader-kicker">STORY SCREENING</span><h1 id="story-reader-title">{project.plan?.title || project.title}</h1><small>{shots.length} 镜 · {completed} 镜画面已就绪</small></div><div className="reader-toolbar-actions"><div className="reader-modes" aria-label="预览方式"><button type="button" aria-pressed={mode === "read"} onClick={() => { setMode("read"); content.current?.scrollTo({ top: 0 }); }}><BookOpen size={15} />连续阅读</button><button type="button" aria-pressed={mode === "screen"} onClick={() => { setMode("screen"); navigate(activeIndex); }}><Maximize2 size={15} />全屏翻看</button><button type="button" aria-pressed={mode === "path"} onClick={() => { setMode("path"); content.current?.scrollTo({ top: 0 }); }}><Route size={15} />路径展映</button></div><button type="button" className="reader-close" aria-label="关闭故事成片预览" onClick={onClose}><X size={21} /></button></div></header>
     <StoryExport project={project} inputChanged={inputChanged} />
     {inputChanged && <p className="reader-version-warning" role="status">故事或风格已修改。这里展示的是上次规划的分镜，请返回工作台重新规划后再检查。</p>}
     <div className="reader-content" ref={content}>
       {mode === "read" && <div className="reader-intro"><Clapperboard size={24} /><span>故事成片预览</span><p>{project.plan?.synopsis}</p><small>按镜头顺序阅读，看看情绪和动作是否自然接续。</small></div>}
-      {shots.length ? mode === "read" ? shots.map(frame) : frame(shots[activeIndex], activeIndex) : <p className="reader-no-shots">还没有分镜，请返回工作台先规划故事。</p>}
+      {shots.length ? mode === "read" ? shots.map(frame) : mode === "path" ? <JourneyTimeline scrollRoot={content} steps={shots.map((shot, i) => ({ key: shot.id, label: "第 " + String(i + 1).padStart(2, "0") + " 镜", title: shot.title, content: frame(shot, i) }))} /> : frame(shots[activeIndex], activeIndex) : <p className="reader-no-shots">还没有分镜，请返回工作台先规划故事。</p>}
       {mode === "read" && shots.length > 0 && <div className="reader-end"><span>THE END</span><p>{completed === shots.length ? "故事已到最后一镜。" : `故事已到最后一镜，还有 ${shots.length - completed} 镜待生成或重拍。`}</p></div>}
     </div>
     {mode === "screen" && shots.length > 0 && <nav className="reader-navigation" aria-label="镜头翻页"><button type="button" aria-label="上一镜" disabled={activeIndex === 0} onClick={() => navigate(activeIndex - 1)}><ArrowLeft size={18} /><span>上一镜</span></button><div className="reader-shot-picker">{shots.map((shot, i) => <button key={shot.id} type="button" aria-label={`跳到第${i + 1}镜：${shot.title}`} aria-current={i === activeIndex ? "step" : undefined} onClick={() => navigate(i)}>{String(i + 1).padStart(2, "0")}</button>)}</div><span className="reader-counter" role="status">{activeIndex + 1} / {shots.length}</span><button type="button" aria-label="下一镜" disabled={activeIndex === shots.length - 1} onClick={() => navigate(activeIndex + 1)}><span>下一镜</span><ArrowRight size={18} /></button></nav>}

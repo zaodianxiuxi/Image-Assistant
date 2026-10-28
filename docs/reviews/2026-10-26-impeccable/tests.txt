@@ -1,0 +1,776 @@
+
+> image-assistant@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: stores an API key locally without returning it to the browser
+ok 1 - stores an API key locally without returning it to the browser
+  ---
+  duration_ms: 2095.8798
+  type: 'test'
+  ...
+# Subtest: returns a locally served URL after saving a generated image
+ok 2 - returns a locally served URL after saving a generated image
+  ---
+  duration_ms: 2088.9391
+  type: 'test'
+  ...
+# Subtest: does not serve a generated-image route with a traversal file name
+ok 3 - does not serve a generated-image route with a traversal file name
+  ---
+  duration_ms: 1.3002
+  type: 'test'
+  ...
+# Subtest: returns six server-generated prompt ideas through the local API
+ok 4 - returns six server-generated prompt ideas through the local API
+  ---
+  duration_ms: 6.745
+  type: 'test'
+  ...
+# Subtest: proxies generated images through the Vite development server
+ok 5 - proxies generated images through the Vite development server
+  ---
+  duration_ms: 1.4498
+  type: 'test'
+  ...
+# Subtest: creates and reuses the Image-Assisant folder from the Windows desktop path
+ok 6 - creates and reuses the Image-Assisant folder from the Windows desktop path
+  ---
+  duration_ms: 6.0509
+  type: 'test'
+  ...
+# Subtest: writes base64 and remote provider images as local PNG URLs
+ok 7 - writes base64 and remote provider images as local PNG URLs
+  ---
+  duration_ms: 17.7544
+  type: 'test'
+  ...
+# Subtest: accepts only server-generated PNG file names
+ok 8 - accepts only server-generated PNG file names
+  ---
+  duration_ms: 0.3015
+  type: 'test'
+  ...
+# Subtest: normalizes provider output to the requested poetry image size
+ok 9 - normalizes provider output to the requested poetry image size
+  ---
+  duration_ms: 54.3924
+  type: 'test'
+  ...
+# Subtest: reference output keeps edge details when the provider returns another aspect ratio
+ok 10 - reference output keeps edge details when the provider returns another aspect ratio
+  ---
+  duration_ms: 23.8096
+  type: 'test'
+  ...
+# Subtest: uses gpt-image-2.5-sunburst for health, generation and editing
+ok 11 - uses gpt-image-2.5-sunburst for health, generation and editing
+  ---
+  duration_ms: 2072.9384
+  type: 'test'
+  ...
+# Subtest: uses gpt-image-2.5-flare for health, generation and editing
+ok 12 - uses gpt-image-2.5-flare for health, generation and editing
+  ---
+  duration_ms: 242.6778
+  type: 'test'
+  ...
+# Subtest: uses gpt-image-2 for health, generation and editing
+ok 13 - uses gpt-image-2 for health, generation and editing
+  ---
+  duration_ms: 260.2417
+  type: 'test'
+  ...
+# Subtest: rejects an unsupported generate size before checking the API key
+ok 14 - rejects an unsupported generate size before checking the API key
+  ---
+  duration_ms: 1980.0786
+  type: 'test'
+  ...
+# Subtest: rejects an unsupported edit size before checking the API key
+ok 15 - rejects an unsupported edit size before checking the API key
+  ---
+  duration_ms: 7.843
+  type: 'test'
+  ...
+# Subtest: accepts the three supported output sizes
+ok 16 - accepts the three supported output sizes
+  ---
+  duration_ms: 0.5174
+  type: 'test'
+  ...
+# Subtest: rejects an unsupported output size
+ok 17 - rejects an unsupported output size
+  ---
+  duration_ms: 0.0912
+  type: 'test'
+  ...
+# Subtest: reports delivery-version storage unavailable without MySQL
+ok 18 - reports delivery-version storage unavailable without MySQL
+  ---
+  duration_ms: 1845.5358
+  type: 'test'
+  ...
+# Subtest: exposes version metadata in the gallery query and response mapping
+ok 19 - exposes version metadata in the gallery query and response mapping
+  ---
+  duration_ms: 4.8164
+  type: 'test'
+  ...
+# Subtest: updates an existing API key without changing unrelated configuration
+ok 20 - updates an existing API key without changing unrelated configuration
+  ---
+  duration_ms: 0.7448
+  type: 'test'
+  ...
+# Subtest: creates a local environment file when no configuration exists
+ok 21 - creates a local environment file when no configuration exists
+  ---
+  duration_ms: 19.5908
+  type: 'test'
+  ...
+# Subtest: starts without mysql2 when MySQL is not configured
+ok 22 - starts without mysql2 when MySQL is not configured
+  ---
+  duration_ms: 1813.2937
+  type: 'test'
+  ...
+# Subtest: turns a poem into validated visual scenes
+ok 23 - turns a poem into validated visual scenes
+  ---
+  duration_ms: 15.1425
+  type: 'test'
+  ...
+# Subtest: long legacy supplements retain the complete selected quality in planning
+ok 24 - long legacy supplements retain the complete selected quality in planning
+  ---
+  duration_ms: 1.0276
+  type: 'test'
+  ...
+# Subtest: analyzes a poem before generating storyboard prompts
+ok 25 - analyzes a poem before generating storyboard prompts
+  ---
+  duration_ms: 1.4198
+  type: 'test'
+  ...
+# Subtest: validates confirmed poetry analysis
+ok 26 - validates confirmed poetry analysis
+  ---
+  duration_ms: 0.5523
+  type: 'test'
+  ...
+# Subtest: trims an occasional extra storyboard scene instead of failing
+ok 27 - trims an occasional extra storyboard scene instead of failing
+  ---
+  duration_ms: 0.1344
+  type: 'test'
+  ...
+# Subtest: requires a poem and text model
+ok 28 - requires a poem and text model
+  ---
+  duration_ms: 0.2383
+  type: 'test'
+  ...
+# Subtest: retries transient poetry gateway timeouts
+ok 29 - retries transient poetry gateway timeouts
+  ---
+  duration_ms: 814.0637
+  type: 'test'
+  ...
+# Subtest: normalizes reference modes and always starts independently
+ok 30 - normalizes reference modes and always starts independently
+  ---
+  duration_ms: 0.1864
+  type: 'test'
+  ...
+# Subtest: persists editable poetry projects and restores legacy poetry series
+ok 31 - persists editable poetry projects and restores legacy poetry series
+  ---
+  duration_ms: 51.8763
+  type: 'test'
+  ...
+# Subtest: keeps only valid Chinese prompt candidates and removes existing prompts
+ok 32 - keeps only valid Chinese prompt candidates and removes existing prompts
+  ---
+  duration_ms: 1.5764
+  type: 'test'
+  ...
+# Subtest: writes only the newest 120 valid prompt cache entries
+ok 33 - writes only the newest 120 valid prompt cache entries
+  ---
+  duration_ms: 14.7928
+  type: 'test'
+  ...
+# Subtest: requires an explicitly configured text model
+ok 34 - requires an explicitly configured text model
+  ---
+  duration_ms: 1.3648
+  type: 'test'
+  ...
+# Subtest: requests six validated Chinese prompt ideas from the configured text model
+ok 35 - requests six validated Chinese prompt ideas from the configured text model
+  ---
+  duration_ms: 16.1645
+  type: 'test'
+  ...
+# Subtest: supplies user input for providers that map system messages to Responses instructions
+ok 36 - supplies user input for providers that map system messages to Responses instructions
+  ---
+  duration_ms: 0.6846
+  type: 'test'
+  ...
+# Subtest: returns three complete ideas using preferences and excluding previous titles
+ok 37 - returns three complete ideas using preferences and excluding previous titles
+  ---
+  duration_ms: 20.0361
+  type: 'test'
+  ...
+# Subtest: rejects incomplete or repeated cards and overlong input
+ok 38 - rejects incomplete or repeated cards and overlong input
+  ---
+  duration_ms: 1.1314
+  type: 'test'
+  ...
+# Subtest: expands the selected idea into editable prose and rejects empty prose
+ok 39 - expands the selected idea into editable prose and rejects empty prose
+  ---
+  duration_ms: 1.0376
+  type: 'test'
+  ...
+# Subtest: reports upstream and malformed responses without returning partial content
+ok 40 - reports upstream and malformed responses without returning partial content
+  ---
+  duration_ms: 0.6515
+  type: 'test'
+  ...
+# Subtest: plans a four-shot modern story with named characters and continuity
+ok 41 - plans a four-shot modern story with named characters and continuity
+  ---
+  duration_ms: 19.2948
+  type: 'test'
+  ...
+# Subtest: rejects unknown character references and missing transition information
+ok 42 - rejects unknown character references and missing transition information
+  ---
+  duration_ms: 0.9785
+  type: 'test'
+  ...
+# Subtest: honors an explicit shot count and rejects invalid input before calling provider
+ok 43 - honors an explicit shot count and rejects invalid input before calling provider
+  ---
+  duration_ms: 0.4053
+  type: 'test'
+  ...
+# Subtest: legacy series receives usable prompts with stable character descriptions
+ok 44 - legacy series receives usable prompts with stable character descriptions
+  ---
+  duration_ms: 0.5712
+  type: 'test'
+  ...
+# Subtest: requires a configured vision model
+ok 45 - requires a configured vision model
+  ---
+  duration_ms: 0.8875
+  type: 'test'
+  ...
+# Subtest: requires an API key
+ok 46 - requires an API key
+  ---
+  duration_ms: 0.6976
+  type: 'test'
+  ...
+# Subtest: sends the image to the configured vision model and parses all fields
+ok 47 - sends the image to the configured vision model and parses all fields
+  ---
+  duration_ms: 18.2544
+  type: 'test'
+  ...
+# Subtest: rejects incomplete model analysis
+ok 48 - rejects incomplete model analysis
+  ---
+  duration_ms: 0.7126
+  type: 'test'
+  ...
+# Subtest: rejects invalid model JSON
+ok 49 - rejects invalid model JSON
+  ---
+  duration_ms: 0.5075
+  type: 'test'
+  ...
+# Subtest: reports upstream API errors
+ok 50 - reports upstream API errors
+  ---
+  duration_ms: 0.4724
+  type: 'test'
+  ...
+# Subtest: requires new picture content
+ok 51 - requires new picture content
+  ---
+  duration_ms: 1.2492
+  type: 'test'
+  ...
+# Subtest: falls back to the vision model when no text model is configured
+ok 52 - falls back to the vision model when no text model is configured
+  ---
+  duration_ms: 18.7197
+  type: 'test'
+  ...
+# Subtest: composes new content with reusable style fields and strips size text
+ok 53 - composes new content with reusable style fields and strips size text
+  ---
+  duration_ms: 1.2591
+  type: 'test'
+  ...
+# Subtest: reports composition API errors
+ok 54 - reports composition API errors
+  ---
+  duration_ms: 0.6501
+  type: 'test'
+  ...
+# Subtest: returns 503 when the vision model is not configured
+ok 55 - returns 503 when the vision model is not configured
+  ---
+  duration_ms: 1622.7246
+  type: 'test'
+  ...
+# Subtest: rejects a non-image reference upload
+ok 56 - rejects a non-image reference upload
+  ---
+  duration_ms: 207.2928
+  type: 'test'
+  ...
+# Subtest: rejects composition without new picture content
+ok 57 - rejects composition without new picture content
+  ---
+  duration_ms: 198.0798
+  type: 'test'
+  ...
+# Subtest: accepts uploads exactly at the 50 MB total limit
+ok 58 - accepts uploads exactly at the 50 MB total limit
+  ---
+  duration_ms: 0.5331
+  type: 'test'
+  ...
+# Subtest: rejects uploads larger than the 50 MB total limit
+ok 59 - rejects uploads larger than the 50 MB total limit
+  ---
+  duration_ms: 0.1048
+  type: 'test'
+  ...
+# Subtest: frontend exposes a ten-image reference limit
+ok 60 - frontend exposes a ten-image reference limit
+  ---
+  duration_ms: 18.202
+  type: 'test'
+  ...
+# Subtest: frontend exposes common output ratios for every creation mode
+ok 61 - frontend exposes common output ratios for every creation mode
+  ---
+  duration_ms: 1.3242
+  type: 'test'
+  ...
+# Subtest: groups gallery records into ordered series and node levels
+ok 62 - groups gallery records into ordered series and node levels
+  ---
+  duration_ms: 2.6639
+  type: 'test'
+  ...
+# Subtest: sorts images newest first and breaks equal timestamps by id
+ok 63 - sorts images newest first and breaks equal timestamps by id
+  ---
+  duration_ms: 0.3457
+  type: 'test'
+  ...
+# Subtest: missing or invalid saved preferences fall back to balanced
+ok 64 - missing or invalid saved preferences fall back to balanced
+  ---
+  duration_ms: 0.5734
+  type: 'test'
+  ...
+# Subtest: original and edit preserve the user's exact text
+ok 65 - original and edit preserve the user's exact text
+  ---
+  duration_ms: 0.814
+  type: 'test'
+  ...
+# Subtest: gentle rendering retains explicit style and night intent with readable midtones
+ok 66 - gentle rendering retains explicit style and night intent with readable midtones
+  ---
+  duration_ms: 0.2853
+  type: 'test'
+  ...
+# Subtest: reusing history replaces a previous preset instead of stacking directions
+ok 67 - reusing history replaces a previous preset instead of stacking directions
+  ---
+  duration_ms: 0.1604
+  type: 'test'
+  ...
+# Subtest: poetry output and planning supplement use the same selected direction
+ok 68 - poetry output and planning supplement use the same selected direction
+  ---
+  duration_ms: 0.3562
+  type: 'test'
+  ...
+# Subtest: creates a first session version without changing its prompt
+ok 69 - creates a first session version without changing its prompt
+  ---
+  duration_ms: 0.579
+  type: 'test'
+  ...
+# Subtest: creates a child version in the same group
+ok 70 - creates a child version in the same group
+  ---
+  duration_ms: 0.0897
+  type: 'test'
+  ...
+# Subtest: marks only the selected version as the delivery version
+ok 71 - marks only the selected version as the delivery version
+  ---
+  duration_ms: 0.1337
+  type: 'test'
+  ...
+# Subtest: poetry prompts use only the current scene and explicit direction
+ok 72 - poetry prompts use only the current scene and explicit direction
+  ---
+  duration_ms: 0.6128
+  type: 'test'
+  ...
+# Subtest: an absent style gets a natural default without invented character
+ok 73 - an absent style gets a natural default without invented character
+  ---
+  duration_ms: 0.1668
+  type: 'test'
+  ...
+# Subtest: previous image requires explicit continuation and immediate matching collection
+ok 74 - previous image requires explicit continuation and immediate matching collection
+  ---
+  duration_ms: 0.7068
+  type: 'test'
+  ...
+# Subtest: retries temporary image errors and reports every retry
+ok 75 - retries temporary image errors and reports every retry
+  ---
+  duration_ms: 1.1652
+  type: 'test'
+  ...
+# Subtest: does not retry permanent image errors
+ok 76 - does not retry permanent image errors
+  ---
+  duration_ms: 0.3914
+  type: 'test'
+  ...
+# Subtest: provides a poetry interpretation workbench and per-scene image generation
+ok 77 - provides a poetry interpretation workbench and per-scene image generation
+  ---
+  duration_ms: 17.6232
+  type: 'test'
+  ...
+# Subtest: uses right-side drawers for the prompt library, series creation, and API settings
+ok 78 - uses right-side drawers for the prompt library, series creation, and API settings
+  ---
+  duration_ms: 1.7939
+  type: 'test'
+  ...
+# Subtest: renders the daily prompt hotlist and fills the selected prompt
+ok 79 - renders the daily prompt hotlist and fills the selected prompt
+  ---
+  duration_ms: 16.3287
+  type: 'test'
+  ...
+# Subtest: provides an icon-only local refresh action for the prompt hotlist
+ok 80 - provides an icon-only local refresh action for the prompt hotlist
+  ---
+  duration_ms: 1.7402
+  type: 'test'
+  ...
+# Subtest: provides a guarded action to generate and merge new prompt ideas
+ok 81 - provides a guarded action to generate and merge new prompt ideas
+  ---
+  duration_ms: 1.6048
+  type: 'test'
+  ...
+# Subtest: opens generated and history images in a resilient preview with a saved theme
+ok 82 - opens generated and history images in a resilient preview with a saved theme
+  ---
+  duration_ms: 1.6816
+  type: 'test'
+  ...
+# Subtest: provides zoom controls and a larger scrollable image preview
+ok 83 - provides zoom controls and a larger scrollable image preview
+  ---
+  duration_ms: 2.0803
+  type: 'test'
+  ...
+# Subtest: provides a local API key configuration page without exposing the saved key
+ok 84 - provides a local API key configuration page without exposing the saved key
+  ---
+  duration_ms: 1.6243
+  type: 'test'
+  ...
+# Subtest: gives the image preview scrollbars a dedicated dark interactive style
+ok 85 - gives the image preview scrollbars a dedicated dark interactive style
+  ---
+  duration_ms: 0.6165
+  type: 'test'
+  ...
+# Subtest: keeps complete thumbnails visible and frames the result image inside the canvas
+ok 86 - keeps complete thumbnails visible and frames the result image inside the canvas
+  ---
+  duration_ms: 0.5308
+  type: 'test'
+  ...
+# Subtest: groups saved images by series and puts legacy records in 其他
+ok 87 - groups saved images by series and puts legacy records in 其他
+  ---
+  duration_ms: 1.2608
+  type: 'test'
+  ...
+# Subtest: renders saved images in a series and node hierarchy
+ok 88 - renders saved images in a series and node hierarchy
+  ---
+  duration_ms: 1.1939
+  type: 'test'
+  ...
+# Subtest: shows each gallery image prompt and supports collapsing nodes
+ok 89 - shows each gallery image prompt and supports collapsing nodes
+  ---
+  duration_ms: 1.2117
+  type: 'test'
+  ...
+# Subtest: supports collapsing gallery series groups independently from nodes
+ok 90 - supports collapsing gallery series groups independently from nodes
+  ---
+  duration_ms: 2.1525
+  type: 'test'
+  ...
+# Subtest: starts saved gallery series groups collapsed
+ok 91 - starts saved gallery series groups collapsed
+  ---
+  duration_ms: 1.1742
+  type: 'test'
+  ...
+# Subtest: connects history images to editing and delivery-version actions
+ok 92 - connects history images to editing and delivery-version actions
+  ---
+  duration_ms: 1.1461
+  type: 'test'
+  ...
+# Subtest: clears the carried prompt when canceling a continued history edit
+ok 93 - clears the carried prompt when canceling a continued history edit
+  ---
+  duration_ms: 0.9847
+  type: 'test'
+  ...
+# Subtest: provides a persistent three-theme menu for the full-width workspace
+ok 94 - provides a persistent three-theme menu for the full-width workspace
+  ---
+  duration_ms: 1.3633
+  type: 'test'
+  ...
+# Subtest: opens a structured image-to-prompt workbench without automatic generation
+ok 95 - opens a structured image-to-prompt workbench without automatic generation
+  ---
+  duration_ms: 1.3793
+  type: 'test'
+  ...
+# Subtest: keeps the desktop workbench fixed and uses a readable Chinese type scale
+ok 96 - keeps the desktop workbench fixed and uses a readable Chinese type scale
+  ---
+  duration_ms: 0.7824
+  type: 'test'
+  ...
+# Subtest: keeps gallery thumbnails compact and gives scroll containers a visible scrollbar
+ok 97 - keeps gallery thumbnails compact and gives scroll containers a visible scrollbar
+  ---
+  duration_ms: 0.6106
+  type: 'test'
+  ...
+# Subtest: makes the style extraction workbench readable and less dense
+ok 98 - makes the style extraction workbench readable and less dense
+  ---
+  duration_ms: 1.2173
+  type: 'test'
+  ...
+# Subtest: presents the style extraction workbench as a larger right-side drawer
+ok 99 - presents the style extraction workbench as a larger right-side drawer
+  ---
+  duration_ms: 0.8048
+  type: 'test'
+  ...
+# Subtest: places style extraction in the right extension rail
+ok 100 - places style extraction in the right extension rail
+  ---
+  duration_ms: 1.3265
+  type: 'test'
+  ...
+# Subtest: presents the prompt library and series manager as right-side drawers
+ok 101 - presents the prompt library and series manager as right-side drawers
+  ---
+  duration_ms: 1.5258
+  type: 'test'
+  ...
+# Subtest: provides a substantial Chinese prompt collection across all supported aspect ratios
+ok 102 - provides a substantial Chinese prompt collection across all supported aspect ratios
+  ---
+  duration_ms: 1.9115
+  type: 'test'
+  ...
+# Subtest: keeps the daily hotlist stable for the same day and limits visible entries
+ok 103 - keeps the daily hotlist stable for the same day and limits visible entries
+  ---
+  duration_ms: 1.808
+  type: 'test'
+  ...
+# Subtest: changes the unique hotlist selection when the refresh index changes
+ok 104 - changes the unique hotlist selection when the refresh index changes
+  ---
+  duration_ms: 0.2125
+  type: 'test'
+  ...
+# Subtest: shows generated prompts first and removes aspect-ratio text
+ok 105 - shows generated prompts first and removes aspect-ratio text
+  ---
+  duration_ms: 0.1679
+  type: 'test'
+  ...
+# Subtest: snapshot preserves planned order and only the adopted images without mutating project
+ok 106 - snapshot preserves planned order and only the adopted images without mutating project
+  ---
+  duration_ms: 1.3188
+  type: 'test'
+  ...
+# Subtest: export text includes all captions, missing shots and input-change warning without prompts
+ok 107 - export text includes all captions, missing shots and input-change warning without prompts
+  ---
+  duration_ms: 0.9381
+  type: 'test'
+  ...
+# Subtest: filenames retain Chinese but cannot create paths, reserved names or excessive lengths
+ok 108 - filenames retain Chinese but cannot create paths, reserved names or excessive lengths
+  ---
+  duration_ms: 0.4192
+  type: 'test'
+  ...
+# Subtest: empty or over-limit projects are rejected; image errors are reflected
+ok 109 - empty or over-limit projects are rejected; image errors are reflected
+  ---
+  duration_ms: 0.3874
+  type: 'test'
+  ...
+# Subtest: text wrapping preserves newlines and Unicode graphemes without splitting emoji
+ok 110 - text wrapping preserves newlines and Unicode graphemes without splitting emoji
+  ---
+  duration_ms: 11.6626
+  type: 'test'
+  ...
+# Subtest: pagination never splits a shot or exceeds canvas limits, including introductory page
+ok 111 - pagination never splits a shot or exceeds canvas limits, including introductory page
+  ---
+  duration_ms: 0.2666
+  type: 'test'
+  ...
+# Subtest: a retake retains the selected image and imports legacy output once
+ok 112 - a retake retains the selected image and imports legacy output once
+  ---
+  duration_ms: 1.8004
+  type: 'test'
+  ...
+# Subtest: adoption marks downstream results stale and repeated selection is a no-op
+ok 113 - adoption marks downstream results stale and repeated selection is a no-op
+  ---
+  duration_ms: 0.3073
+  type: 'test'
+  ...
+# Subtest: old candidates cannot erase stale status after reference, shot, or canvas changes
+ok 114 - old candidates cannot erase stale status after reference, shot, or canvas changes
+  ---
+  duration_ms: 0.3684
+  type: 'test'
+  ...
+# Subtest: previous frame version and availability affect continuity of a candidate
+ok 115 - previous frame version and availability affect continuity of a candidate
+  ---
+  duration_ms: 0.1413
+  type: 'test'
+  ...
+# Subtest: batch generation adopts new image but preserves prior versions
+ok 116 - batch generation adopts new image but preserves prior versions
+  ---
+  duration_ms: 0.1246
+  type: 'test'
+  ...
+# Subtest: missing outputs and invalid selections never lose stored images
+ok 117 - missing outputs and invalid selections never lose stored images
+  ---
+  duration_ms: 0.1999
+  type: 'test'
+  ...
+# Subtest: legacy stale images stay stale, serialized candidates retain their generation context
+ok 118 - legacy stale images stay stale, serialized candidates retain their generation context
+  ---
+  duration_ms: 0.2282
+  type: 'test'
+  ...
+# Subtest: generation correction includes selected issues and notes without dropping original prompt
+ok 119 - generation correction includes selected issues and notes without dropping original prompt
+  ---
+  duration_ms: 0.2216
+  type: 'test'
+  ...
+# Subtest: new story input and reselecting an already-stale active image cannot clear warnings
+ok 120 - new story input and reselecting an already-stale active image cannot clear warnings
+  ---
+  duration_ms: 0.2697
+  type: 'test'
+  ...
+# Subtest: stable references match the cast, previous frame is used only within the same scene
+ok 121 - stable references match the cast, previous frame is used only within the same scene
+  ---
+  duration_ms: 2.1498
+  type: 'test'
+  ...
+# Subtest: trial renders at most the first four missing shots, continuation skips completed shots
+ok 122 - trial renders at most the first four missing shots, continuation skips completed shots
+  ---
+  duration_ms: 0.8327
+  type: 'test'
+  ...
+# Subtest: prompt separates reference identity from new shot composition
+ok 123 - prompt separates reference identity from new shot composition
+  ---
+  duration_ms: 0.4619
+  type: 'test'
+  ...
+# Subtest: creates a reusable profile without source image content
+ok 124 - creates a reusable profile without source image content
+  ---
+  duration_ms: 2.9675
+  type: 'test'
+  ...
+# Subtest: recovers from invalid local storage data
+ok 125 - recovers from invalid local storage data
+  ---
+  duration_ms: 0.453
+  type: 'test'
+  ...
+# Subtest: updates and removes profiles without mutation
+ok 126 - updates and removes profiles without mutation
+  ---
+  duration_ms: 0.2227
+  type: 'test'
+  ...
+# Subtest: keeps only reusable fields and valid locks when parsing
+ok 127 - keeps only reusable fields and valid locks when parsing
+  ---
+  duration_ms: 0.2339
+  type: 'test'
+  ...
+1..127
+# tests 127
+# suites 0
+# pass 127
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2794.9756
