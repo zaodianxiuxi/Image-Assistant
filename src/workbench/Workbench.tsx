@@ -22,17 +22,23 @@ import type {
   WorkspaceFile,
   WorkspaceState,
   WorkspaceView,
+  WorkspaceProject,
+  ReadingPosition,
 } from "./types";
-import { formatDate, requestJson } from "./types";
+import { formatDate, requestJson, jsonRequest } from "./types";
 import FileLibrary, { FileThumbnail } from "./FileLibrary";
 import DocumentReader from "./DocumentReader";
+import ProjectSpace, { RecentProjects } from "./ProjectSpace";
+import ReadingWorkspace from "./ReadingWorkspace";
 import ConversionDialog from "./ConversionDialog";
 import TaskCenter from "./TaskCenter";
 import "./workbench.css";
 import "./workbench-materials.css";
+import "./projects.css";
 const SpatialDesk = lazy(() => import("./SpatialDesk"));
 const ImageWorkspace = lazy(() => import("../App"));
 const views: WorkspaceView[] = [
+  "projects",
   "desk",
   "files",
   "reader",
@@ -83,10 +89,13 @@ const tools = [
   },
 ];
 function initialView(): WorkspaceView {
-  const hash = location.hash.replace("#/", "");
+  const hash = location.hash.replace("#/", "").split("?")[0];
   return views.includes(hash as WorkspaceView)
     ? (hash as WorkspaceView)
     : "desk";
+}
+function routeParam(name: string) {
+  return new URLSearchParams(location.hash.split("?")[1] || "").get(name);
 }
 function initialTheme() {
   try {
@@ -100,14 +109,24 @@ export default function Workbench() {
   const [view, setView] = useState<WorkspaceView>(initialView);
   const [imageOpened, setImageOpened] = useState(initialView() === "create");
   const [theme, setTheme] = useState(initialTheme);
-  const [state, setState] = useState<WorkspaceState>({ files: [], tasks: [] });
+  const [state, setState] = useState<WorkspaceState>({
+    files: [],
+    tasks: [],
+    projects: [],
+    reading: [],
+  });
   const [engine, setEngine] = useState<EngineStatus | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [engineLoading, setEngineLoading] = useState(false);
-  const [readingId, setReadingId] = useState<string | null>(null);
+  const [readingId, setReadingId] = useState<string | null>(() =>
+    routeParam("file"),
+  );
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() =>
+    routeParam("project"),
+  );
   const [converting, setConverting] = useState<WorkspaceFile[] | null>(null);
   const refresh = useCallback(async () => {
     try {
@@ -177,21 +196,78 @@ export default function Workbench() {
     const change = () => {
       const next = initialView();
       setView(next);
+      setReadingId(routeParam("file"));
+      setActiveProjectId(routeParam("project"));
       if (next === "create") setImageOpened(true);
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);
   function navigate(next: WorkspaceView) {
+    if (next === "reader") {
+      const last = [...state.reading].sort((a, b) =>
+        (b.updatedAt || "").localeCompare(a.updatedAt || ""),
+      )[0];
+      const file = state.files.find(
+        (f) => f.id === (readingId || last?.fileId),
+      );
+      if (file) {
+        read(
+          file,
+          state.projects.find((p) => p.id === (activeProjectId || last?.scope)),
+        );
+        return;
+      }
+    }
     setView(next);
     if (next === "create") setImageOpened(true);
     location.hash = "/" + next;
   }
-  function read(file: WorkspaceFile) {
+  function read(file: WorkspaceFile, project?: WorkspaceProject) {
     setReadingId(file.id);
-    navigate("reader");
+    setActiveProjectId(project?.id || null);
+    setView("reader");
+    location.hash =
+      "/reader?file=" +
+      encodeURIComponent(file.id) +
+      (project ? "&project=" + encodeURIComponent(project.id) : "");
   }
-  async function upload(files: File[]) {
+  function openProject(id: string | null) {
+    setActiveProjectId(id);
+    setView("projects");
+    location.hash =
+      "/projects" + (id ? "?project=" + encodeURIComponent(id) : "");
+  }
+  function updateProject(project: WorkspaceProject) {
+    setState((current) => ({
+      ...current,
+      projects: [
+        project,
+        ...current.projects.filter((p) => p.id !== project.id),
+      ],
+    }));
+  }
+  function readingSaved(position: ReadingPosition) {
+    setState((current) => ({
+      ...current,
+      reading: [
+        position,
+        ...current.reading.filter(
+          (p) => p.scope !== position.scope || p.fileId !== position.fileId,
+        ),
+      ],
+      projects: current.projects.map((p) =>
+        p.id === position.scope
+          ? {
+              ...p,
+              lastFileId: position.fileId,
+              updatedAt: position.updatedAt || p.updatedAt,
+            }
+          : p,
+      ),
+    }));
+  }
+  async function upload(files: File[], projectId?: string) {
     if (!files.length) return;
     if (files.length > 10) {
       setError("每次最多上传 10 个文件。");
@@ -206,7 +282,24 @@ export default function Workbench() {
     const form = new FormData();
     files.forEach((file) => form.append("files", file));
     try {
-      await requestJson("/files", { method: "POST", body: form });
+      const imported = await requestJson<{ files: WorkspaceFile[] }>("/files", {
+        method: "POST",
+        body: form,
+      });
+      if (projectId) {
+        try {
+          updateProject(
+            await requestJson<WorkspaceProject>(
+              "/projects/" + projectId + "/files",
+              jsonRequest("POST", { fileIds: imported.files.map((f) => f.id) }),
+            ),
+          );
+        } catch {
+          throw new Error(
+            "文件已导入文件库，但关联项目未成功。请使用“关联文件库中的资料”重试。",
+          );
+        }
+      }
       await refresh();
       setNotice("已保存 " + files.length + " 份文件，可以阅读或转换。");
     } catch (e) {
@@ -240,10 +333,13 @@ export default function Workbench() {
     void refresh();
   }
   const reading = state.files.find((f) => f.id === readingId);
+  const activeProject = state.projects.find((p) => p.id === activeProjectId);
   const pageTitle =
     view === "desk"
       ? "我的工作台"
-      : tools.find((tool) => tool.id === view)?.name || "工作台";
+      : view === "projects"
+        ? activeProject?.name || "项目空间"
+        : tools.find((tool) => tool.id === view)?.name || "工作台";
   const completed = state.tasks.filter((t) => t.status === "completed").length;
   return (
     <>
@@ -273,6 +369,15 @@ export default function Workbench() {
             >
               <Layers3 size={18} />
               <span>空间桌面</span>
+            </button>
+            <button
+              type="button"
+              className={view === "projects" ? "is-active" : ""}
+              aria-current={view === "projects" ? "page" : undefined}
+              onClick={() => openProject(null)}
+            >
+              <FolderOpen size={18} />
+              <span>项目空间</span>
             </button>
             {tools.map((tool) => (
               <button
@@ -423,6 +528,13 @@ export default function Workbench() {
                     ))}
                   </nav>
                 </section>
+                <RecentProjects
+                  projects={state.projects}
+                  files={state.files}
+                  onOpen={openProject}
+                  onRead={read}
+                  onAll={() => openProject(null)}
+                />
                 <div className="wb-home-bottom">
                   <section className="wb-recent">
                     <div className="wb-section-heading">
@@ -490,6 +602,20 @@ export default function Workbench() {
                 </div>
               </>
             )}
+            {view === "projects" && (
+              <ProjectSpace
+                key={activeProjectId || "all"}
+                projects={state.projects}
+                project={activeProject}
+                files={state.files}
+                uploading={uploading}
+                onSelect={openProject}
+                onUpdate={updateProject}
+                onUpload={upload}
+                onRead={read}
+                onConvert={setConverting}
+              />
+            )}
             {(view === "files" || view === "tools") && (
               <>
                 {view === "tools" && (
@@ -534,13 +660,31 @@ export default function Workbench() {
                 />
               </>
             )}
-            {view === "reader" && (
-              <DocumentReader
-                file={reading}
-                onFiles={() => navigate("files")}
-                onConvert={setConverting}
-              />
-            )}
+            {view === "reader" &&
+              (reading ? (
+                <ReadingWorkspace
+                  key={(activeProject?.id || "library") + reading.id}
+                  file={reading}
+                  project={activeProject}
+                  initial={state.reading.find(
+                    (p) =>
+                      p.fileId === reading.id &&
+                      p.scope === (activeProject?.id || "library"),
+                  )}
+                  onFiles={() =>
+                    activeProject
+                      ? openProject(activeProject.id)
+                      : navigate("files")
+                  }
+                  onConvert={setConverting}
+                  onSaved={readingSaved}
+                />
+              ) : (
+                <DocumentReader
+                  onFiles={() => navigate("files")}
+                  onConvert={setConverting}
+                />
+              ))}
             {view === "tasks" && (
               <TaskCenter
                 files={state.files}

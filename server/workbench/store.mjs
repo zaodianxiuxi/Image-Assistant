@@ -67,7 +67,13 @@ export function cleanName(value) {
 export class WorkbenchStore {
   constructor(directory) {
     this.directory = directory;
-    this.state = { files: [], tasks: [] };
+    this.state = {
+      files: [],
+      tasks: [],
+      projects: [],
+      notebooks: {},
+      reading: {},
+    };
     this.writes = Promise.resolve();
     this.ready = this.load();
   }
@@ -79,7 +85,12 @@ export class WorkbenchStore {
       );
       if (!Array.isArray(parsed.files) || !Array.isArray(parsed.tasks))
         throw new Error("文件索引格式不正确。");
-      this.state = parsed;
+      this.state = {
+        ...parsed,
+        projects: parsed.projects || [],
+        notebooks: parsed.notebooks || {},
+        reading: parsed.reading || {},
+      };
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
@@ -142,7 +153,12 @@ export class WorkbenchStore {
   }
   async list() {
     await this.ready;
-    return { files: this.state.files, tasks: this.state.tasks };
+    return {
+      files: this.state.files,
+      tasks: this.state.tasks,
+      projects: this.state.projects,
+      reading: Object.values(this.state.reading),
+    };
   }
   async addTasks(files, target, quality) {
     await this.ready;

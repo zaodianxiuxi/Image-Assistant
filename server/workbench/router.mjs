@@ -4,6 +4,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { mkdir, unlink, open } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { registerProjectRoutes } from "./projects.mjs";
 import { FileeAdapter } from "./filee.mjs";
 import { WorkbenchStore, ConversionQueue, fileMime } from "./store.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -15,6 +16,17 @@ export function createWorkbenchRouter({
   const store = new WorkbenchStore(directory);
   store.ready.catch(() => {});
   const queue = new ConversionQueue(store, adapter);
+  registerProjectRoutes(router, store);
+  router.get("/pdf-assets/:type/:name", (req, res) => {
+    const { type, name } = req.params;
+    if (
+      !["cmaps", "standard_fonts", "wasm", "iccs"].includes(type) ||
+      !/^[a-zA-Z0-9_.-]+$/.test(name) ||
+      name.includes("..")
+    )
+      return res.sendStatus(404);
+    res.sendFile(path.join(root, "node_modules", "pdfjs-dist", type, name));
+  });
   const upload = multer({
     storage: multer.diskStorage({
       destination(req, file, done) {
@@ -133,12 +145,9 @@ export function createWorkbenchRouter({
     for (const file of files) {
       const capability = await adapter.targets(file.name);
       if (!capability.targets.some((t) => t.id === target))
-        return res
-          .status(400)
-          .json({
-            error:
-              file.name + "：" + (capability.message || "此格式不可转换。"),
-          });
+        return res.status(400).json({
+          error: file.name + "：" + (capability.message || "此格式不可转换。"),
+        });
     }
     const tasks = await store.addTasks(files, target, quality);
     queue.kick();
@@ -155,7 +164,7 @@ export function createWorkbenchRouter({
           : error.message || "文件工作区暂时不可用。";
     res
       .type("application/json")
-      .status(error instanceof multer.MulterError ? 413 : 500)
+      .status(error instanceof multer.MulterError ? 413 : error.status || 500)
       .json({ error: message });
   });
   return router;

@@ -54,6 +54,8 @@ const imageModel = process.env.SUDOCODE_IMAGE_MODEL?.trim() || "gpt-image-2.5-su
 const envFile = process.env.IMAGE_ASSISTANT_ENV_FILE || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".env");
 let generatedImageDirectoryPromise;
 
+// Notes allow 200 excerpts plus a 100k-character body, including UTF-8 text.
+app.use("/api/workbench/notebooks", express.json({ limit: "8mb" }));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/workbench", createWorkbenchRouter());
 

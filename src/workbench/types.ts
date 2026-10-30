@@ -1,10 +1,5 @@
 export type WorkspaceView =
-  | "desk"
-  | "files"
-  | "reader"
-  | "tools"
-  | "tasks"
-  | "create";
+  "projects" | "desk" | "files" | "reader" | "tools" | "tasks" | "create";
 export type WorkspaceFile = {
   id: string;
   name: string;
@@ -27,7 +22,42 @@ export type WorkspaceTask = {
   error?: string;
   warning?: string;
 };
-export type WorkspaceState = { files: WorkspaceFile[]; tasks: WorkspaceTask[] };
+export type WorkspaceProject = {
+  id: string;
+  name: string;
+  fileIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  lastFileId?: string;
+};
+export type ReadingPosition = {
+  scope: string;
+  fileId: string;
+  page: number;
+  offset: number;
+  zoom: number;
+  updatedAt?: string;
+};
+export type Excerpt = {
+  id: string;
+  text: string;
+  page?: number;
+  offset?: number;
+};
+export type Notebook = {
+  scope: string;
+  fileId: string;
+  body: string;
+  excerpts: Excerpt[];
+  revision: number;
+  updatedAt: string | null;
+};
+export type WorkspaceState = {
+  files: WorkspaceFile[];
+  tasks: WorkspaceTask[];
+  projects: WorkspaceProject[];
+  reading: ReadingPosition[];
+};
 export type EngineStatus = {
   available: boolean;
   version: string | null;
@@ -65,6 +95,15 @@ export async function requestJson<T>(
   } catch {
     throw new Error("文件服务暂时不可用，请确认本地服务已启动。");
   }
-  if (!response.ok) throw new Error(data.error || "操作未完成，请重试。");
+  if (!response.ok)
+    throw Object.assign(new Error(data.error || "操作未完成，请重试。"), {
+      status: response.status,
+    });
   return data as T;
 }
+
+export const jsonRequest = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});

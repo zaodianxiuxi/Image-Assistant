@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRightLeft,
@@ -9,20 +9,39 @@ import {
   Minus,
   Plus,
   LoaderCircle,
+  Quote,
 } from "lucide-react";
-import type { WorkspaceFile } from "./types";
+import type { WorkspaceFile, ReadingPosition, Excerpt } from "./types";
 import { fileUrl, formatSize, requestJson } from "./types";
+const PdfReader = lazy(() => import("./PdfReader"));
 type Props = {
+  position?: ReadingPosition;
+  onPosition?: (patch: Partial<ReadingPosition>) => void;
+  onCapture?: (excerpt: Omit<Excerpt, "id">) => void;
+  source?: { excerpt: Excerpt; token: number } | null;
   file?: WorkspaceFile;
   onFiles: () => void;
   onConvert: (files: WorkspaceFile[]) => void;
 };
-export default function DocumentReader({ file, onFiles, onConvert }: Props) {
+export default function DocumentReader({
+  file,
+  onFiles,
+  onConvert,
+  position,
+  onPosition,
+  onCapture,
+  source,
+}: Props) {
   const [text, setText] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [zoom, setZoom] = useState(100);
+  const zoom = position?.zoom || 100;
+  const setZoom = (value: number | ((n: number) => number)) =>
+    onPosition?.({ zoom: typeof value === "function" ? value(zoom) : value });
+  const surface = useRef<HTMLDivElement>(null);
+  const initialOffset = useRef(position?.offset || 0);
+  const [selection, setSelection] = useState("");
   const [query, setQuery] = useState("");
   const mark = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -30,7 +49,7 @@ export default function DocumentReader({ file, onFiles, onConvert }: Props) {
     setText("");
     setError("");
     setQuery("");
-    setZoom(100);
+    setSelection("");
     setTruncated(false);
     setLoading(false);
     if (file?.kind === "text") {
@@ -55,6 +74,44 @@ export default function DocumentReader({ file, onFiles, onConvert }: Props) {
       cancelled = true;
     };
   }, [file?.id]);
+  useEffect(() => {
+    const captureSelection = () => {
+      const selected = window.getSelection();
+      if (
+        selected &&
+        surface.current?.contains(selected.anchorNode) &&
+        surface.current.contains(selected.focusNode)
+      ) {
+        setSelection(selected.toString().trim().slice(0, 10000));
+      } else {
+        setSelection("");
+      }
+    };
+    document.addEventListener("selectionchange", captureSelection);
+    return () =>
+      document.removeEventListener("selectionchange", captureSelection);
+  }, []);
+  useEffect(() => {
+    setSelection("");
+  }, [position?.page]);
+  useEffect(() => {
+    if (file?.kind !== "text" || loading || !text || !surface.current) return;
+    const element = surface.current;
+    element.scrollTop =
+      initialOffset.current *
+      Math.max(0, element.scrollHeight - element.clientHeight);
+  }, [loading, text, file?.kind]);
+  useEffect(() => {
+    if (!source) return;
+    if (source.excerpt.page) onPosition?.({ page: source.excerpt.page });
+    else {
+      setQuery(source.excerpt.text);
+      if (surface.current)
+        surface.current.scrollTop =
+          (source.excerpt.offset || 0) *
+          (surface.current.scrollHeight - surface.current.clientHeight);
+    }
+  }, [source]);
   const found = query
     ? text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase())
     : -1;
@@ -98,6 +155,27 @@ export default function DocumentReader({ file, onFiles, onConvert }: Props) {
           </small>
         </div>
         <div className="wb-reader-actions">
+          {(file.kind === "text" || file.kind === "pdf") && (
+            <button
+              type="button"
+              className="wb-secondary"
+              disabled={!selection}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onCapture?.({
+                  text: selection,
+                  ...(file.kind === "pdf"
+                    ? { page: position?.page || 1 }
+                    : { offset: position?.offset || 0 }),
+                });
+                setSelection("");
+                window.getSelection()?.removeAllRanges();
+              }}
+            >
+              <Quote size={15} />
+              摘录到笔记
+            </button>
+          )}
           <button
             type="button"
             className="wb-secondary"
@@ -157,7 +235,19 @@ export default function DocumentReader({ file, onFiles, onConvert }: Props) {
           {truncated && <span>预览前 1 MB，下载可查看全文</span>}
         </div>
       )}
-      <div className={"wb-reading-surface read-" + file.kind}>
+      <div
+        ref={surface}
+        className={"wb-reading-surface read-" + file.kind}
+        onScroll={(e) => {
+          if (file.kind !== "text" || loading) return;
+          const target = e.currentTarget;
+          onPosition?.({
+            offset:
+              target.scrollTop /
+              Math.max(1, target.scrollHeight - target.clientHeight),
+          });
+        }}
+      >
         {error ? (
           <div className="wb-empty" role="alert">
             <FileQuestion size={32} />
@@ -167,11 +257,23 @@ export default function DocumentReader({ file, onFiles, onConvert }: Props) {
             </a>
           </div>
         ) : file.kind === "pdf" ? (
-          <iframe
-            key={file.id}
-            title={"阅读 " + file.name}
-            src={fileUrl(file.id)}
-          />
+          <Suspense
+            fallback={
+              <div className="wb-empty">
+                <LoaderCircle className="wb-spin" />
+                正在打开 PDF…
+              </div>
+            }
+          >
+            <PdfReader
+              key={file.id}
+              fileId={file.id}
+              page={position?.page || 1}
+              onPage={(page) => onPosition?.({ page })}
+              zoom={zoom}
+              onZoom={setZoom}
+            />
+          </Suspense>
         ) : file.kind === "image" ? (
           <div className="wb-image-scroll">
             <img

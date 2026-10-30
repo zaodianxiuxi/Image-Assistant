@@ -20,6 +20,7 @@ type Props = {
   onRead: (file: WorkspaceFile) => void;
   onConvert: (files: WorkspaceFile[]) => void;
   conversionMode?: boolean;
+  projectMode?: boolean;
 };
 export function FileThumbnail({ file }: { file: WorkspaceFile }) {
   const [failed, setFailed] = useState(false);
@@ -42,6 +43,7 @@ export default function FileLibrary({
   onRead,
   onConvert,
   conversionMode = false,
+  projectMode = false,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -71,12 +73,18 @@ export default function FileLibrary({
             {conversionMode ? "CONVERT & CONTINUE" : "YOUR FILES, TOGETHER"}
           </span>
           <h1>
-            {conversionMode ? "让文件，换一种形式。" : "每一份文件，都有去处。"}
+            {conversionMode
+              ? "让文件，换一种形式。"
+              : projectMode
+                ? "项目资料"
+                : "每一份文件，都有去处。"}
           </h1>
           <p>
             {conversionMode
               ? "选择已有文件，转换格式后继续阅读或下载。"
-              : "把资料放在这里。阅读、转换，再开始下一步。"}
+              : projectMode
+                ? "选择资料开始阅读，也可以导入文件或关联已有资料。"
+                : "把资料放在这里。阅读、转换，再开始下一步。"}
           </p>
         </div>
         <button
@@ -227,7 +235,13 @@ export default function FileLibrary({
       ) : (
         <div className="wb-empty">
           <FolderOpen size={33} />
-          <h3>{query ? "没有找到这个文件" : "你的文件库还是空的"}</h3>
+          <h3>
+            {query
+              ? "没有找到这个文件"
+              : projectMode
+                ? "项目还没有资料"
+                : "你的文件库还是空的"}
+          </h3>
           <p>
             {query
               ? "换一个关键词试试。"

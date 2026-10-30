@@ -1,0 +1,544 @@
+/* Project spaces and the connected reader use plain, quiet controls. */
+.wb-project-recent {
+  margin: 30px 0 12px;
+}
+.wb-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  gap: 14px;
+}
+.wb-project-card {
+  border: 1px solid var(--wb-line);
+  border-radius: 11px;
+  padding: 19px;
+  background: var(--wb-surface);
+  min-width: 0;
+}
+.wb-project-open {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  text-align: left;
+  color: var(--wb-ink);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.wb-project-open strong {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.wb-project-card p {
+  margin: 14px 0 0;
+  color: var(--wb-muted);
+  font-size: 11px;
+}
+.wb-project-resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 15px;
+  border: 0;
+  border-top: 1px solid var(--wb-line);
+  padding: 13px 0 0;
+  width: 100%;
+  background: none;
+  text-align: left;
+  color: var(--wb-accent);
+  font-size: 12px;
+}
+.wb-project-resume span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wb-project-start {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  border: 1px dashed var(--wb-line);
+  padding: 23px;
+  border-radius: 11px;
+  background: var(--wb-surface);
+  color: var(--wb-ink);
+  text-align: left;
+}
+.wb-project-start span {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+.wb-project-start strong {
+  font-weight: 500;
+}
+.wb-project-start small {
+  color: var(--wb-muted);
+}
+.wb-project-create {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: var(--wb-surface);
+  border: 1px solid var(--wb-line);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 20px 0 26px;
+}
+.wb-project-create input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--wb-line);
+  background: var(--wb-page);
+  color: var(--wb-ink);
+  border-radius: 6px;
+}
+.wb-project-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin: 24px 0;
+}
+.wb-project-heading h1 {
+  font-size: 30px;
+  margin: 7px 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.wb-project-heading p {
+  font-size: 12px;
+  color: var(--wb-muted);
+  margin: 0;
+}
+.wb-project-heading > button {
+  flex-shrink: 0;
+}
+.wb-project-attach {
+  margin: 0 0 25px;
+  padding: 16px;
+  background: var(--wb-surface);
+  border: 1px solid var(--wb-line);
+  border-radius: 9px;
+}
+.wb-project-attach summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.wb-project-attach summary svg {
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.wb-project-attach > input {
+  margin: 18px 0 10px;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--wb-line);
+  border-radius: 5px;
+  background: var(--wb-page);
+  color: var(--wb-ink);
+}
+.wb-attach-list {
+  max-height: 240px;
+  overflow: auto;
+  margin: 10px 0 15px;
+}
+.wb-attach-list label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.wb-project-space .wb-file-library .wb-page-heading h1 {
+  font-size: 20px;
+}
+.wb-project-space .wb-file-library .wb-page-heading .wb-kicker {
+  display: none;
+}
+.wb-project-overview-note {
+  margin-top: 28px;
+}
+.wb-project-overview-note .wb-notebook {
+  max-height: none;
+}
+.wb-project-overview-note .wb-excerpt-heading,
+.wb-project-overview-note .wb-excerpt-empty {
+  display: none;
+}
+.wb-reading-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 17px;
+  font-size: 11px;
+  color: var(--wb-muted);
+  margin-bottom: 13px;
+}
+.wb-reading-context span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--wb-ink);
+}
+.wb-reading-context button {
+  border: 0;
+  background: none;
+  color: #b7533e;
+}
+.wb-reading-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 16px;
+  align-items: start;
+}
+.wb-reading-split .wb-reader {
+  min-width: 0;
+  height: calc(100dvh - 200px);
+}
+.wb-reading-split .wb-reader-toolbar {
+  flex-wrap: wrap;
+  padding: 12px 15px;
+  gap: 10px;
+}
+.wb-reading-split .wb-reader-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
+.wb-reading-split .wb-reader-actions button,
+.wb-reading-split .wb-reader-actions a {
+  font-size: 11px;
+  padding: 6px 10px;
+}
+.wb-reading-split .read-pdf {
+  overflow: hidden;
+}
+.wb-notebook {
+  min-width: 0;
+  max-height: calc(100dvh - 200px);
+  overflow: auto;
+  padding: 21px;
+  background: var(--wb-surface);
+  border: 1px solid var(--wb-line);
+  border-radius: 11px;
+}
+.wb-notebook > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wb-notebook h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+.wb-notebook .wb-kicker {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+}
+.wb-notebook-context {
+  margin: 14px 0 5px;
+  color: var(--wb-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.wb-note-status {
+  font-size: 10px;
+  color: var(--wb-accent);
+  margin: 0 0 20px;
+}
+.wb-note-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 9px;
+}
+.wb-notebook textarea {
+  display: block;
+  width: 100%;
+  min-height: 250px;
+  resize: vertical;
+  padding: 13px;
+  border: 1px solid var(--wb-line);
+  border-radius: 7px;
+  background: var(--wb-page);
+  color: var(--wb-ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.wb-notebook textarea::placeholder {
+  color: var(--wb-muted);
+}
+.wb-note-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid #c879625c;
+  border-radius: 6px;
+  padding: 10px;
+  background: #c8796210;
+  color: var(--wb-ink);
+  font-size: 12px;
+  margin: 10px 0;
+}
+.wb-note-error span {
+  flex: 1;
+}
+.wb-note-error button {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: var(--wb-accent);
+  text-decoration: underline;
+}
+.wb-note-conflict {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--wb-line);
+  font-size: 12px;
+}
+.wb-note-conflict pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 230px;
+  overflow: auto;
+}
+.wb-note-conflict blockquote {
+  margin: 10px 0;
+  border-left: 2px solid var(--wb-line);
+  padding-left: 8px;
+}
+.wb-excerpt-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 25px;
+}
+.wb-excerpt-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.wb-excerpt-heading span {
+  color: var(--wb-muted);
+  font-size: 11px;
+}
+.wb-excerpt-empty,
+.wb-excerpt-notice {
+  color: var(--wb-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.wb-excerpts article {
+  padding: 13px 0;
+  border-top: 1px solid var(--wb-line);
+}
+.wb-excerpts blockquote {
+  margin: 0;
+  padding: 0 0 0 11px;
+  border-left: 2px solid var(--wb-line);
+  font-size: 12px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+.wb-excerpts footer {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 11px;
+}
+.wb-excerpts footer button {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wb-accent);
+  font-size: 10px;
+}
+.wb-pdf-reader {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.wb-pdf-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 9px;
+  border-bottom: 1px solid var(--wb-line);
+  background: var(--wb-surface);
+  font-size: 11px;
+}
+.wb-pdf-controls input {
+  width: 48px;
+  padding: 4px;
+  border: 1px solid var(--wb-line);
+  border-radius: 4px;
+  background: var(--wb-page);
+  color: var(--wb-ink);
+  text-align: center;
+}
+.wb-pdf-controls select {
+  border: 1px solid var(--wb-line);
+  border-radius: 5px;
+  padding: 5px;
+  background: var(--wb-surface);
+  color: var(--wb-ink);
+}
+.wb-pdf-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+.wb-pdf-paper {
+  position: relative;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 2px 12px #0002;
+}
+.wb-pdf-paper canvas {
+  display: block;
+}
+.wb-pdf-notice {
+  font-size: 11px;
+  padding: 8px 12px;
+  margin: 0;
+  color: var(--wb-muted);
+}
+/* TextLayer geometry follows PDF.js (Apache-2.0). Scoped to this reader. */
+.wb-pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  text-align: initial;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  color-scheme: only light;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.wb-pdf-text-layer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+}
+.wb-pdf-text-layer > :not(.markedContent),
+.wb-pdf-text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+.wb-pdf-text-layer .markedContent {
+  display: contents;
+}
+.wb-pdf-text-layer ::selection {
+  background: #7295d66b;
+  color: transparent;
+}
+@media (max-width: 1100px) {
+  .wb-reading-split {
+    grid-template-columns: minmax(0, 1fr) 270px;
+    gap: 12px;
+  }
+  .wb-notebook {
+    padding: 15px;
+  }
+}
+@media (max-width: 850px) {
+  .wb-reading-split {
+    grid-template-columns: 1fr;
+  }
+  .wb-notebook {
+    max-height: none;
+  }
+  .wb-reading-split .wb-reader {
+    height: 70dvh;
+    min-height: 480px;
+  }
+}
+@media (max-width: 600px) {
+  .wb-project-create {
+    gap: 8px;
+    padding: 10px;
+    flex-wrap: wrap;
+  }
+  .wb-project-create > svg {
+    display: none;
+  }
+  .wb-project-create input {
+    min-width: 160px;
+  }
+  .wb-project-heading {
+    align-items: start;
+  }
+  .wb-project-heading h1 {
+    font-size: 25px;
+  }
+  .wb-project-heading p {
+    line-height: 1.7;
+  }
+  .wb-project-grid {
+    grid-template-columns: 1fr;
+  }
+  .wb-project-card {
+    padding: 16px;
+  }
+  .wb-reading-context {
+    gap: 6px;
+  }
+  .wb-reading-split .wb-reader-toolbar {
+    padding: 10px;
+  }
+  .wb-reading-split .wb-reader-actions {
+    gap: 5px;
+  }
+  .wb-reading-split .wb-reader-actions button {
+    font-size: 10px;
+  }
+  .wb-pdf-viewport {
+    padding: 10px;
+  }
+  .wb-reading-split .wb-reader {
+    min-height: 450px;
+  }
+}
+
+@media (max-width: 600px) {
+  .wb-sidebar nav button {
+    width: calc(100% / 7);
+  }
+}
